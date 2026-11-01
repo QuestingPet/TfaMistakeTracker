@@ -3,13 +3,12 @@ package com.tfamistaketracker;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-// Region IDs cross-checked against LlemonDuck/the-fractured-archive (BSD-2)
+// Region IDs from LlemonDuck/the-fractured-archive (BSD-2)
 @RequiredArgsConstructor
 public enum RaidRoom {
 
     LOBBY(16470),
-    // The Nexus, the hub between bosses, shares the Archive Guardian region but is on plane 2. Seen in the debug logs
-    // with "<name> has returned to the Nexus. Join him..." and "Your leader, <name>, must go first."
+    // The Nexus is on plane 2 of the Archive Guardian region
     NEXUS(16471, 2),
     ARCHIVE_GUARDIAN(16471),
     EZEKIEL(16214),

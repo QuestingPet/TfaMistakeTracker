@@ -28,7 +28,6 @@ public class MistakeStateReader {
     }
 
     public MistakeStateManager read() {
-        // The writer owns the file location, which is set from the plugin directory on startup
         final Filepath mistakeStateFilePath = mistakeStateWriter.getMistakeStateFilePath();
         if (mistakeStateFilePath.exists()) {
             try (BufferedReader reader = mistakeStateFilePath.openBufferedReader();

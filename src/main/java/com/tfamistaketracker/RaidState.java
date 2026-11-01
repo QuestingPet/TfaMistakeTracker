@@ -42,8 +42,6 @@ import static com.tfamistaketracker.RaidRoom.LOBBY;
 @RequiredArgsConstructor(onConstructor_ = @Inject)
 public class RaidState {
 
-    // TFA HUD scripts, analogous to ToA's HUD init script (6585). 10034 rebuilds the HUD party names, 10037 builds
-    // the HUD orbs. Either one running means the raider name varcs may have changed.
     private static final int TFA_HUD_NAMES_SCRIPT_ID = 10034;
     private static final int TFA_HUD_ORBS_SCRIPT_ID = 10037;
 
@@ -59,9 +57,6 @@ public class RaidState {
     );
     private static final Set<Integer> TFA_RAIDER_NAME_VARCS_SET = ImmutableSet.copyOf(TFA_RAIDER_NAME_VARCS);
 
-    // Keep inRaid true for a few ticks after leaving, to cover any gaps between rooms
-    private static final int RAID_LEAVE_GRACE_TICKS = 3;
-
     private final Client client;
     private final EventBus eventBus;
 
@@ -71,14 +66,11 @@ public class RaidState {
     private RaidRoom currentRoom;
     @Getter
     private final Map<String, Raider> raiders = new HashMap<>(); // name -> raider
-    @Getter
-    private int raidLeaveTicks;
 
     private int prevRegion;
     private int prevPlane;
     private boolean newRaid;
-    // Set when the party names may have changed. The raiders are then updated on the next GameTick, once all the name
-    // varcs have settled (the game writes them one at a time).
+    // Name varcs are written one at a time on raid entry, so load raiders on the next tick once they've all been set
     private boolean raidersDirty;
 
     public void startUp() {
@@ -95,7 +87,6 @@ public class RaidState {
         inRaid = false;
         currentRoom = null;
         raiders.clear();
-        raidLeaveTicks = 0;
         prevRegion = -1;
         prevPlane = -1;
         newRaid = false;
@@ -124,8 +115,7 @@ public class RaidState {
             return;
         }
 
-        // If the party may have changed, or we still haven't loaded all raiders, update them. Not all raiders may be
-        // loaded if the plugin is turned on mid-raid, or if the players aren't in the scene yet.
+        // Keep trying until all raiders are loaded, e.g. if the plugin is turned on mid-raid
         if (raidersDirty || !isAllRaidersLoaded(getRaiderNames())) {
             updateRaiders();
         }
@@ -161,8 +151,7 @@ public class RaidState {
 
     @Subscribe
     public void onPlayerSpawned(PlayerSpawned event) {
-        // Players get new objects after a loading screen (e.g. between rooms), so replace any stale raider. Death state
-        // is already reset on loading, and previous locations are no longer valid.
+        // Players get new objects after a loading screen, so replace the stale raider
         Player player = event.getPlayer();
         if (player.getName() != null && raiders.containsKey(player.getName())) {
             log.debug("Raider respawned: {}", player.getName());
@@ -174,9 +163,6 @@ public class RaidState {
         return raiders.containsKey(actor.getName());
     }
 
-    /**
-     * @return The sanitized names of all raiders in the party, as read from the TFA HUD varcs
-     */
     public Set<String> getRaiderNames() {
         Set<String> raiderNames = new HashSet<>(TFA_RAIDER_NAME_VARCS.size());
         for (int varc : TFA_RAIDER_NAME_VARCS) {
@@ -205,7 +191,6 @@ public class RaidState {
         currentRoom = RaidRoom.forLocation(newRegion, newPlane);
         if (currentRoom == prevRoom) return;
 
-        // currentRoom may be null while still in the raid, in any area we don't know about yet
         log.debug("Raid room changed: {}", currentRoom);
         eventBus.post(RaidRoomChanged.builder().newRaidRoom(currentRoom).prevRaidRoom(prevRoom).build());
 
@@ -213,17 +198,13 @@ public class RaidState {
     }
 
     private void updateInRaid() {
-        boolean inRaidRaw = (currentRoom != null && currentRoom != LOBBY) || isRaidHudVisible();
-        raidLeaveTicks = inRaidRaw ? RAID_LEAVE_GRACE_TICKS : Math.max(raidLeaveTicks - 1, 0);
-
-        boolean newInRaid = raidLeaveTicks > 0;
+        boolean newInRaid = (currentRoom != null && currentRoom != LOBBY) || isRaidHudVisible();
         if (newInRaid == inRaid) return;
 
         log.debug("In Raid changed: {}", newInRaid);
         inRaid = newInRaid;
         if (inRaid) {
-            // We can't load the raiders yet in case they're not in the scene or varcs. updateRaiders will post
-            // RaidEntered once they're loaded.
+            // RaidEntered is posted once the raiders are loaded
             newRaid = true;
         } else {
             newRaid = false;
@@ -237,8 +218,7 @@ public class RaidState {
     }
 
     /**
-     * Update the loaded raiders to match the party names in the varcs. Raiders that are still in the party keep their
-     * existing {@link Raider} (and its state), only the differences are added or removed.
+     * Update the loaded raiders to match the party names. Raiders still in the party keep their existing {@link Raider}.
      */
     private void updateRaiders() {
         raidersDirty = false;

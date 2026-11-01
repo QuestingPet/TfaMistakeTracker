@@ -82,9 +82,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * DEBUG ONLY -- remove before publishing.
  * <p>
- * Logs game events with all their relevant ids to a file in the working directory (the repo root when running from
- * IntelliJ or ./gradlew run), so that ids for TFA can be found after a raid. Only active in developer mode with the
- * eventLogger config enabled. Each line is tab-separated: tick, event name, then key=value pairs.
+ * Logs game events to debug-logs/ in the working directory. Each line is tab-separated: tick, event, key=value pairs.
  */
 @Slf4j
 @Singleton
@@ -493,9 +491,8 @@ public class EventLogger {
     }
 
     /**
-     * Object spawns flood on every region load, so only log them in the raid. Outside the raid, both the local player
-     * and the object must be in a raid room: a room's objects spawn during its loading screen, before the raid state
-     * has changed, but a lobby scene load also includes the neighbouring raid regions.
+     * Only log objects in the raid. A room's objects spawn while loading, before the raid state changes, and the lobby
+     * scene includes neighbouring raid regions, so outside the raid both the player and the object must be in a room.
      */
     private boolean shouldLogObject(TileObject object) {
         if (raidState.isInRaid()) return true;
@@ -515,9 +512,7 @@ public class EventLogger {
         return room != null && room != RaidRoom.LOBBY;
     }
 
-    /**
-     * The projectile target point is in instance coords, so convert it to template coords like the other locations.
-     */
+    // The target point is in instance coords
     private String targetPoint(WorldPoint targetPoint) {
         if (targetPoint == null) return "null";
 

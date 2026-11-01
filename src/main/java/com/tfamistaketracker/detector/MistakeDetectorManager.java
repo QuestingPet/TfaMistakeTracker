@@ -151,8 +151,7 @@ public class MistakeDetectorManager {
         }
     }
 
-    // DEBUG ONLY -- uses reflection for hotswap, which is banned on the plugin hub. Remove before publishing.
-    // Recreates every detector so that hotswapped changes to fields and constructors take effect mid-raid.
+    // DEBUG ONLY -- uses reflection for hotswap. Remove before publishing.
     @SneakyThrows
     @VisibleForTesting
     public void reset() {

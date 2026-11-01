@@ -64,7 +64,6 @@ public class DebugOverlayPanel extends OverlayPanel {
                 .text("Game Tick: " + client.getTickCount())
                 .build());
 
-        // Region of the local player, used to find the region IDs for each RaidRoom
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Region")
                 .right(getRegionText())
@@ -80,10 +79,6 @@ public class DebugOverlayPanel extends OverlayPanel {
                     .text("In Raid")
                     .color(Color.GREEN)
                     .build());
-            panelComponent.getChildren().add(LineComponent.builder()
-                    .left("Grace Ticks")
-                    .right(String.valueOf(raidState.getRaidLeaveTicks()))
-                    .build());
         } else {
             panelComponent.getChildren().add(TitleComponent.builder()
                     .text("NOT in raid")
@@ -91,7 +86,6 @@ public class DebugOverlayPanel extends OverlayPanel {
                     .build());
         }
 
-        // Raider names read from the varcs, and whether each one is actually loaded as a raider
         Set<String> raiderNames = raidState.getRaiderNames();
         panelComponent.getChildren().add(TitleComponent.builder()
                 .text("Raiders: " + raidState.getRaiders().size() + "/" + raiderNames.size())
