@@ -1,6 +1,7 @@
 package com.tfamistaketracker;
 
 import com.google.inject.Provides;
+import com.tfamistaketracker.debug.EventLogger;
 import com.tfamistaketracker.detector.MistakeDetectorManager;
 import com.tfamistaketracker.detector.tracker.VengeanceTracker;
 import com.tfamistaketracker.events.InRaidChanged;
@@ -19,6 +20,7 @@ import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -40,7 +42,7 @@ public class TfaMistakeTrackerPlugin extends Plugin {
 
     public static final int CYCLES_PER_GAME_TICK = Constants.GAME_TICK_LENGTH / Constants.CLIENT_TICK_LENGTH;
 
-    static final String CONFIG_GROUP = "tfaMistakeTracker";
+    public static final String CONFIG_GROUP = "tfaMistakeTracker";
 
     private static final int OVERHEAD_TEXT_TICK_TIMEOUT = 5;
     private static final int CYCLES_FOR_OVERHEAD_TEXT = OVERHEAD_TEXT_TICK_TIMEOUT * CYCLES_PER_GAME_TICK;
@@ -75,6 +77,9 @@ public class TfaMistakeTrackerPlugin extends Plugin {
     @Inject
     private DebugOverlayPanel debugOverlayPanel;
 
+    @Inject
+    private EventLogger eventLogger;
+
     // UI fields
     @Inject
     private ClientToolbar clientToolbar;
@@ -100,8 +105,9 @@ public class TfaMistakeTrackerPlugin extends Plugin {
                 .build();
         clientToolbar.addNavigation(navButton);
 
-        // Add debug overlays
+        // Add debug overlays and logging
         overlayManager.add(debugOverlayPanel);
+        eventLogger.startUp();
 
         // Start raid state detection
         clientThread.invoke(() -> {
@@ -118,8 +124,9 @@ public class TfaMistakeTrackerPlugin extends Plugin {
         raidState.shutDown();
         mistakeDetectorManager.shutdown();
 
-        // Remove debug overlays
+        // Remove debug overlays and logging
         overlayManager.remove(debugOverlayPanel);
+        eventLogger.shutDown();
 
         // Remove UI
         clientToolbar.removeNavigation(navButton);
@@ -222,6 +229,17 @@ public class TfaMistakeTrackerPlugin extends Plugin {
     @Subscribe
     public void onRaidEntered(RaidEntered event) {
         panel.newRaid(event.getRaiderNames());
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event) {
+        if (!CONFIG_GROUP.equals(event.getGroup())) return;
+
+        // DEBUG ONLY -- used for debugging with hotswap. Remove before publishing.
+        if ("resetDetectors".equals(event.getKey())) {
+            log.debug("Resetting detectors");
+            mistakeDetectorManager.reset();
+        }
     }
 
     @Provides

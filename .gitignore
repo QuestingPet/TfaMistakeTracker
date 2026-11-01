@@ -10,3 +10,4 @@ nbproject/
 .profileconfig.json
 *.iml
 *.log
+debug-logs/

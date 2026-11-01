@@ -1,0 +1,543 @@
+package com.tfamistaketracker.debug;
+
+import com.tfamistaketracker.TfaMistakeTrackerConfig;
+import com.tfamistaketracker.TfaMistakeTrackerPlugin;
+import com.tfamistaketracker.events.InRaidChanged;
+import com.tfamistaketracker.events.RaidEntered;
+import com.tfamistaketracker.events.RaidRoomChanged;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.Actor;
+import net.runelite.api.ActorSpotAnim;
+import net.runelite.api.Client;
+import net.runelite.api.GraphicsObject;
+import net.runelite.api.Hitsplat;
+import net.runelite.api.NPC;
+import net.runelite.api.Player;
+import net.runelite.api.Projectile;
+import net.runelite.api.TileObject;
+import net.runelite.api.WorldView;
+import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ActorDeath;
+import net.runelite.api.events.AnimationChanged;
+import net.runelite.api.events.AreaSoundEffectPlayed;
+import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.DecorativeObjectDespawned;
+import net.runelite.api.events.DecorativeObjectSpawned;
+import net.runelite.api.events.GameObjectDespawned;
+import net.runelite.api.events.GameObjectSpawned;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
+import net.runelite.api.events.GraphicChanged;
+import net.runelite.api.events.GraphicsObjectCreated;
+import net.runelite.api.events.GroundObjectDespawned;
+import net.runelite.api.events.GroundObjectSpawned;
+import net.runelite.api.events.HitsplatApplied;
+import net.runelite.api.events.InteractingChanged;
+import net.runelite.api.events.NpcChanged;
+import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.NpcSpawned;
+import net.runelite.api.events.OverheadTextChanged;
+import net.runelite.api.events.PlayerDespawned;
+import net.runelite.api.events.PlayerSpawned;
+import net.runelite.api.events.ProjectileMoved;
+import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.events.SoundEffectPlayed;
+import net.runelite.api.events.VarClientIntChanged;
+import net.runelite.api.events.VarClientStrChanged;
+import net.runelite.api.events.VarbitChanged;
+import net.runelite.api.events.WallObjectDespawned;
+import net.runelite.api.events.WallObjectSpawned;
+import net.runelite.api.events.WidgetClosed;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.client.eventbus.EventBus;
+import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.input.KeyManager;
+import net.runelite.client.util.Filepath;
+import net.runelite.client.util.HotkeyListener;
+import net.runelite.client.util.Text;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * DEBUG ONLY -- remove before publishing.
+ * <p>
+ * Logs game events with all their relevant ids to a file in the working directory (the repo root when running from
+ * IntelliJ or ./gradlew run), so that ids for TFA can be found after a raid. Only active in developer mode with the
+ * eventLogger config enabled. Each line is tab-separated: tick, event name, then key=value pairs.
+ */
+@Slf4j
+@Singleton
+public class EventLogger {
+
+    private static final String LOG_DIR_NAME = "debug-logs";
+    private static final DateTimeFormatter FILE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+
+    private final Client client;
+    private final EventBus eventBus;
+    private final KeyManager keyManager;
+    private final TfaMistakeTrackerConfig config;
+    private final boolean developerMode;
+
+    // Projectiles we've already logged, so each one is only logged once. Weak so finished projectiles are dropped.
+    private final Set<Projectile> loggedProjectiles = Collections.newSetFromMap(new WeakHashMap<>());
+
+    private final AtomicInteger markerCount = new AtomicInteger();
+
+    private volatile LogFile logFile;
+
+    private final HotkeyListener markerListener;
+
+    @Inject
+    public EventLogger(Client client, EventBus eventBus, KeyManager keyManager, TfaMistakeTrackerConfig config,
+                       @Named("developerMode") boolean developerMode) {
+        this.client = client;
+        this.eventBus = eventBus;
+        this.keyManager = keyManager;
+        this.config = config;
+        this.developerMode = developerMode;
+
+        this.markerListener = new HotkeyListener(config::eventLoggerMarkerKey) {
+            @Override
+            public void hotkeyPressed() {
+                if (isLogging()) {
+                    write("MARK", "#" + markerCount.incrementAndGet());
+                }
+            }
+        };
+    }
+
+    public void startUp() {
+        eventBus.register(this);
+        keyManager.registerKeyListener(markerListener);
+        if (shouldLog()) {
+            open();
+        }
+    }
+
+    public void shutDown() {
+        keyManager.unregisterKeyListener(markerListener);
+        eventBus.unregister(this);
+        close();
+    }
+
+    public boolean isLogging() {
+        return logFile != null;
+    }
+
+    public int getLastMarker() {
+        return markerCount.get();
+    }
+
+    /**
+     * @return The absolute path of the current log file, or null if not logging
+     */
+    public String getLogFilePath() {
+        LogFile f = logFile;
+        return f == null ? null : f.getAbsolutePath();
+    }
+
+    private boolean shouldLog() {
+        return developerMode && config.eventLogger();
+    }
+
+    private void open() {
+        if (isLogging()) return;
+
+        Filepath dir = Filepath.Unchecked.getRooted(Paths.get(System.getProperty("user.dir"))).joinSegment(LOG_DIR_NAME);
+        String fileName = "tfa-events-" + LocalDateTime.now().format(FILE_TIME_FORMAT) + ".log";
+        LogFile f = new LogFile(dir, dir.joinSegment(fileName));
+        f.open();
+        loggedProjectiles.clear();
+        markerCount.set(0);
+        logFile = f;
+        log.debug("Event logger writing to {}", f.getAbsolutePath());
+    }
+
+    private void close() {
+        LogFile f = logFile;
+        if (f == null) return;
+
+        logFile = null;
+        f.close();
+        log.debug("Event logger closed {}", f.getAbsolutePath());
+    }
+
+    @Subscribe
+    public void onConfigChanged(ConfigChanged event) {
+        if (!TfaMistakeTrackerPlugin.CONFIG_GROUP.equals(event.getGroup())) return;
+        if (!"eventLogger".equals(event.getKey())) return;
+
+        if (shouldLog()) {
+            open();
+        } else {
+            close();
+        }
+    }
+
+    // Plugin events
+
+    @Subscribe
+    public void onInRaidChanged(InRaidChanged e) {
+        write("IN_RAID_CHANGED", "inRaid=" + e.isInRaid());
+    }
+
+    @Subscribe
+    public void onRaidRoomChanged(RaidRoomChanged e) {
+        write("RAID_ROOM_CHANGED", "prev=" + e.getPrevRaidRoom() + " new=" + e.getNewRaidRoom());
+    }
+
+    @Subscribe
+    public void onRaidEntered(RaidEntered e) {
+        write("RAID_ENTERED", "raiders=" + e.getRaiderNames());
+    }
+
+    // Game events
+
+    @Subscribe(priority = 10) // Before everything else, so the tick line comes first for this tick
+    public void onGameTick(GameTick e) {
+        if (!isLogging()) return;
+
+        Player local = client.getLocalPlayer();
+        WorldView wv = client.getTopLevelWorldView();
+        String counts = wv == null ? "" :
+                " players=" + wv.players().stream().count() + " npcs=" + wv.npcs().stream().count();
+        if (local == null) {
+            write("TICK", "local=null" + counts);
+        } else {
+            write("TICK", actorLocation(local) + " anim=" + local.getAnimation() + " pose=" + local.getPoseAnimation()
+                    + counts);
+        }
+
+        LogFile f = logFile;
+        if (f != null) {
+            f.flush();
+        }
+    }
+
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged e) {
+        write("GAME_STATE", "state=" + e.getGameState());
+    }
+
+    @Subscribe
+    public void onNpcSpawned(NpcSpawned e) {
+        write("NPC_SPAWNED", npc(e.getNpc()) + " " + actorLocation(e.getNpc()));
+    }
+
+    @Subscribe
+    public void onNpcDespawned(NpcDespawned e) {
+        write("NPC_DESPAWNED", npc(e.getNpc()) + " " + actorLocation(e.getNpc()));
+    }
+
+    @Subscribe
+    public void onNpcChanged(NpcChanged e) {
+        String oldId = e.getOld() == null ? "null" : String.valueOf(e.getOld().getId());
+        write("NPC_CHANGED", "oldId=" + oldId + " " + npc(e.getNpc()) + " " + actorLocation(e.getNpc()));
+    }
+
+    @Subscribe
+    public void onPlayerSpawned(PlayerSpawned e) {
+        write("PLAYER_SPAWNED", actor(e.getPlayer()) + " " + actorLocation(e.getPlayer()));
+    }
+
+    @Subscribe
+    public void onPlayerDespawned(PlayerDespawned e) {
+        write("PLAYER_DESPAWNED", actor(e.getPlayer()));
+    }
+
+    @Subscribe
+    public void onAnimationChanged(AnimationChanged e) {
+        Actor a = e.getActor();
+        if (a == null) return;
+        write("ANIMATION", actor(a) + " anim=" + a.getAnimation() + " " + actorLocation(a));
+    }
+
+    @Subscribe
+    public void onGraphicChanged(GraphicChanged e) {
+        Actor a = e.getActor();
+        if (a == null) return;
+
+        StringBuilder ids = new StringBuilder();
+        for (ActorSpotAnim spotAnim : a.getSpotAnims()) {
+            if (ids.length() > 0) ids.append(',');
+            ids.append(spotAnim.getId());
+        }
+        write("GRAPHIC", actor(a) + " spotAnims=[" + ids + "] " + actorLocation(a));
+    }
+
+    @Subscribe
+    public void onGraphicsObjectCreated(GraphicsObjectCreated e) {
+        GraphicsObject g = e.getGraphicsObject();
+        int ticksUntilStart = (g.getStartCycle() - client.getGameCycle()) / TfaMistakeTrackerPlugin.CYCLES_PER_GAME_TICK;
+        write("GRAPHICS_OBJECT", "id=" + g.getId() + " startCycle=" + g.getStartCycle()
+                + " ticksUntilStart=" + ticksUntilStart + " " + localLocation(g.getLocation(), g.getLevel()));
+    }
+
+    @Subscribe
+    public void onProjectileMoved(ProjectileMoved e) {
+        Projectile p = e.getProjectile();
+        if (!loggedProjectiles.add(p)) return;
+
+        WorldPoint targetPoint = p.getTargetPoint();
+        write("PROJECTILE", "id=" + p.getId()
+                + " source=[" + actor(p.getSourceActor()) + "]"
+                + " target=[" + actor(p.getTargetActor()) + "]"
+                + " targetPoint=" + (targetPoint == null ? "null" : worldPoint(targetPoint))
+                + " remainingTicks=" + (p.getRemainingCycles() / TfaMistakeTrackerPlugin.CYCLES_PER_GAME_TICK)
+                + " " + localLocation(e.getPosition(), client.getTopLevelWorldView().getPlane()));
+    }
+
+    @Subscribe
+    public void onGameObjectSpawned(GameObjectSpawned e) {
+        write("GAME_OBJECT_SPAWNED", tileObject(e.getGameObject()));
+    }
+
+    @Subscribe
+    public void onGameObjectDespawned(GameObjectDespawned e) {
+        write("GAME_OBJECT_DESPAWNED", tileObject(e.getGameObject()));
+    }
+
+    @Subscribe
+    public void onGroundObjectSpawned(GroundObjectSpawned e) {
+        write("GROUND_OBJECT_SPAWNED", tileObject(e.getGroundObject()));
+    }
+
+    @Subscribe
+    public void onGroundObjectDespawned(GroundObjectDespawned e) {
+        write("GROUND_OBJECT_DESPAWNED", tileObject(e.getGroundObject()));
+    }
+
+    @Subscribe
+    public void onWallObjectSpawned(WallObjectSpawned e) {
+        write("WALL_OBJECT_SPAWNED", tileObject(e.getWallObject()));
+    }
+
+    @Subscribe
+    public void onWallObjectDespawned(WallObjectDespawned e) {
+        write("WALL_OBJECT_DESPAWNED", tileObject(e.getWallObject()));
+    }
+
+    @Subscribe
+    public void onDecorativeObjectSpawned(DecorativeObjectSpawned e) {
+        write("DECORATIVE_OBJECT_SPAWNED", tileObject(e.getDecorativeObject()));
+    }
+
+    @Subscribe
+    public void onDecorativeObjectDespawned(DecorativeObjectDespawned e) {
+        write("DECORATIVE_OBJECT_DESPAWNED", tileObject(e.getDecorativeObject()));
+    }
+
+    @Subscribe
+    public void onHitsplatApplied(HitsplatApplied e) {
+        Hitsplat h = e.getHitsplat();
+        write("HITSPLAT", actor(e.getActor()) + " type=" + h.getHitsplatType() + " amount=" + h.getAmount()
+                + " mine=" + h.isMine() + " others=" + h.isOthers() + " " + actorLocation(e.getActor()));
+    }
+
+    @Subscribe
+    public void onActorDeath(ActorDeath e) {
+        write("ACTOR_DEATH", actor(e.getActor()) + " " + actorLocation(e.getActor()));
+    }
+
+    @Subscribe
+    public void onInteractingChanged(InteractingChanged e) {
+        write("INTERACTING", "source=[" + actor(e.getSource()) + "] target=[" + actor(e.getTarget()) + "]");
+    }
+
+    @Subscribe
+    public void onOverheadTextChanged(OverheadTextChanged e) {
+        write("OVERHEAD_TEXT", actor(e.getActor()) + " text=" + clean(e.getOverheadText()));
+    }
+
+    @Subscribe
+    public void onChatMessage(ChatMessage e) {
+        write("CHAT", "type=" + e.getType() + " name=" + clean(e.getName()) + " message="
+                + clean(Text.removeTags(e.getMessage())));
+    }
+
+    @Subscribe
+    public void onVarbitChanged(VarbitChanged e) {
+        write("VAR", "varbit=" + e.getVarbitId() + " varp=" + e.getVarpId() + " value=" + e.getValue());
+    }
+
+    @Subscribe
+    public void onVarClientIntChanged(VarClientIntChanged e) {
+        write("VARC_INT", "index=" + e.getIndex() + " value=" + client.getVarcIntValue(e.getIndex()));
+    }
+
+    @Subscribe
+    public void onVarClientStrChanged(VarClientStrChanged e) {
+        write("VARC_STR", "index=" + e.getIndex() + " value=" + clean(client.getVarcStrValue(e.getIndex())));
+    }
+
+    @Subscribe
+    public void onWidgetLoaded(WidgetLoaded e) {
+        write("WIDGET_LOADED", "group=" + e.getGroupId());
+    }
+
+    @Subscribe
+    public void onWidgetClosed(WidgetClosed e) {
+        write("WIDGET_CLOSED", "group=" + e.getGroupId() + " unload=" + e.isUnload());
+    }
+
+    @Subscribe
+    public void onSoundEffectPlayed(SoundEffectPlayed e) {
+        write("SOUND", "id=" + e.getSoundId() + " delay=" + e.getDelay() + " source=[" + actor(e.getSource()) + "]");
+    }
+
+    @Subscribe
+    public void onAreaSoundEffectPlayed(AreaSoundEffectPlayed e) {
+        LocalPoint lp = LocalPoint.fromScene(e.getSceneX(), e.getSceneY(), client.getTopLevelWorldView());
+        write("AREA_SOUND", "id=" + e.getSoundId() + " range=" + e.getRange() + " delay=" + e.getDelay()
+                + " source=[" + actor(e.getSource()) + "] "
+                + localLocation(lp, client.getTopLevelWorldView().getPlane()));
+    }
+
+    @Subscribe
+    public void onScriptPostFired(ScriptPostFired e) {
+        if (!config.eventLoggerScripts()) return;
+        write("SCRIPT", "id=" + e.getScriptId());
+    }
+
+    // Formatting
+
+    private void write(String event, String details) {
+        LogFile f = logFile;
+        if (f == null) return;
+        f.write(client.getTickCount() + "\t" + event + "\t" + details);
+    }
+
+    private String npc(NPC npc) {
+        return "id=" + npc.getId() + " name=" + clean(npc.getName()) + " index=" + npc.getIndex()
+                + " size=" + (npc.getComposition() == null ? "?" : npc.getComposition().getSize());
+    }
+
+    private String actor(Actor actor) {
+        if (actor == null) {
+            return "null";
+        } else if (actor instanceof NPC) {
+            NPC npc = (NPC) actor;
+            return "npc id=" + npc.getId() + " name=" + clean(npc.getName()) + " index=" + npc.getIndex();
+        } else if (actor instanceof Player) {
+            return "player name=" + clean(actor.getName());
+        }
+        return "actor name=" + clean(actor.getName());
+    }
+
+    private String actorLocation(Actor actor) {
+        if (actor == null) return "loc=null";
+        LocalPoint lp = actor.getLocalLocation();
+        WorldPoint instance = actor.getWorldLocation();
+        return localLocation(lp, instance == null ? client.getTopLevelWorldView().getPlane() : instance.getPlane());
+    }
+
+    private String tileObject(TileObject object) {
+        return "id=" + object.getId() + " " + localLocation(object.getLocalLocation(), object.getPlane());
+    }
+
+    /**
+     * Format a local location as both template (fromLocalInstance) coords with region, and instance coords.
+     */
+    private String localLocation(LocalPoint lp, int plane) {
+        if (lp == null) return "loc=null";
+
+        WorldPoint template = WorldPoint.fromLocalInstance(client, lp, plane);
+        WorldPoint instance = WorldPoint.fromLocal(client.getTopLevelWorldView(), lp.getX(), lp.getY(), plane);
+        return worldPoint(template) + " ix=" + instance.getX() + " iy=" + instance.getY();
+    }
+
+    private static String worldPoint(WorldPoint wp) {
+        return "region=" + wp.getRegionID() + " plane=" + wp.getPlane() + " x=" + wp.getX() + " y=" + wp.getY()
+                + " rx=" + wp.getRegionX() + " ry=" + wp.getRegionY();
+    }
+
+    private static String clean(String s) {
+        if (s == null) return "null";
+        return s.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
+    }
+
+    /**
+     * A single log file and the executor that owns it. All disk IO happens on the executor thread.
+     */
+    private static class LogFile {
+
+        private final Filepath dir;
+        private final Filepath file;
+        @Getter
+        private final String absolutePath;
+        private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        // Only accessed on the executor thread
+        private BufferedWriter writer;
+
+        LogFile(Filepath dir, Filepath file) {
+            this.dir = dir;
+            this.file = file;
+            this.absolutePath = Filepath.Unchecked.getPath(file).toAbsolutePath().toString();
+        }
+
+        void open() {
+            executor.execute(() -> {
+                try {
+                    dir.createDirectories();
+                    writer = file.openBufferedWriter();
+                } catch (IOException e) {
+                    log.error("Unable to open event log " + absolutePath, e);
+                }
+            });
+        }
+
+        void write(String line) {
+            executor.execute(() -> {
+                if (writer == null) return;
+                try {
+                    writer.write(line);
+                    writer.newLine();
+                } catch (IOException e) {
+                    log.error("Unable to write event log " + absolutePath, e);
+                }
+            });
+        }
+
+        void flush() {
+            executor.execute(() -> {
+                if (writer == null) return;
+                try {
+                    writer.flush();
+                } catch (IOException e) {
+                    log.error("Unable to flush event log " + absolutePath, e);
+                }
+            });
+        }
+
+        void close() {
+            executor.execute(() -> {
+                if (writer == null) return;
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    log.error("Unable to close event log " + absolutePath, e);
+                }
+                writer = null;
+            });
+            // Let the queued writes and the close finish, without blocking the caller
+            executor.shutdown();
+        }
+    }
+}

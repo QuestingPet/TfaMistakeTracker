@@ -3,6 +3,7 @@ package com.tfamistaketracker.overlay;
 import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.TfaMistakeTrackerConfig;
 import com.tfamistaketracker.TfaMistakeTrackerPlugin;
+import com.tfamistaketracker.debug.EventLogger;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.MistakeDetectorManager;
 import net.runelite.api.Client;
@@ -30,6 +31,7 @@ public class DebugOverlayPanel extends OverlayPanel {
     private final TfaMistakeTrackerConfig config;
 
     private final MistakeDetectorManager mistakeDetectorManager;
+    private final EventLogger eventLogger;
 
     private final boolean developerMode;
 
@@ -38,6 +40,7 @@ public class DebugOverlayPanel extends OverlayPanel {
                              RaidState raidState,
                              TfaMistakeTrackerConfig config,
                              MistakeDetectorManager mistakeDetectorManager,
+                             EventLogger eventLogger,
                              @Named("developerMode") boolean developerMode) {
         super(plugin);
         setPosition(OverlayPosition.TOP_RIGHT);
@@ -47,6 +50,7 @@ public class DebugOverlayPanel extends OverlayPanel {
         this.raidState = raidState;
         this.config = config;
         this.mistakeDetectorManager = mistakeDetectorManager;
+        this.eventLogger = eventLogger;
         this.developerMode = developerMode;
     }
 
@@ -92,6 +96,23 @@ public class DebugOverlayPanel extends OverlayPanel {
                     .left(name)
                     .build());
         });
+
+        // Event logger state
+        boolean logging = eventLogger.isLogging();
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("Event Logger")
+                .right(logging ? "ON" : "OFF")
+                .rightColor(logging ? Color.GREEN : Color.RED)
+                .build());
+        if (logging) {
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Last Mark")
+                    .right("#" + eventLogger.getLastMarker())
+                    .build());
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left(eventLogger.getLogFilePath())
+                    .build());
+        }
 
         // Add all mistake detectors
         renderMistakeDetector(mistakeDetectorManager.getClass().getSimpleName(),

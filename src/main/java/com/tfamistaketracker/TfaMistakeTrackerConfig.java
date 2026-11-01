@@ -5,6 +5,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Keybind;
 
 @ConfigGroup(TfaMistakeTrackerPlugin.CONFIG_GROUP)
 public interface TfaMistakeTrackerConfig extends Config {
@@ -61,14 +62,73 @@ public interface TfaMistakeTrackerConfig extends Config {
         return TfaMistake.defaultDeathMessage();
     }
 
+    // DEBUG ONLY -- everything in this section is for development and must be removed before publishing
+    @ConfigSection(
+            name = "Debug",
+            description = "Developer tools. Only work in developer mode.",
+            position = 4,
+            closedByDefault = true
+    )
+    String debugSettings = "debugSettings";
+
     @VisibleForDevtools
     @ConfigItem(
             keyName = "debugMode",
             name = "Debug Mode",
             description = "Show the debug overlay. Only works in developer mode.",
-            position = 4
+            section = debugSettings,
+            position = 0
     )
     default boolean debugMode() {
+        return false;
+    }
+
+    @VisibleForDevtools
+    @ConfigItem(
+            keyName = "eventLogger",
+            name = "Event Logger",
+            description = "Log game events and their ids to debug-logs/ in the working directory. Only works in " +
+                    "developer mode.",
+            section = debugSettings,
+            position = 1
+    )
+    default boolean eventLogger() {
+        return false;
+    }
+
+    @VisibleForDevtools
+    @ConfigItem(
+            keyName = "eventLoggerScripts",
+            name = "Event Logger Scripts",
+            description = "Also log every script that runs. Very noisy.",
+            section = debugSettings,
+            position = 2
+    )
+    default boolean eventLoggerScripts() {
+        return false;
+    }
+
+    @VisibleForDevtools
+    @ConfigItem(
+            keyName = "eventLoggerMarkerKey",
+            name = "Event Logger Marker Key",
+            description = "Press to write a numbered marker line into the event log.",
+            section = debugSettings,
+            position = 3
+    )
+    default Keybind eventLoggerMarkerKey() {
+        return Keybind.NOT_SET;
+    }
+
+    @VisibleForDevtools
+    @ConfigItem(
+            keyName = "resetDetectors",
+            name = "Reset Detectors",
+            description = "Toggle to recreate all mistake detectors, for picking up hotswapped changes.",
+            section = debugSettings,
+            position = 4
+    )
+    default boolean resetDetectors() {
         return false;
     }
 }
