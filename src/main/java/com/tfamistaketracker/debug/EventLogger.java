@@ -1,5 +1,7 @@
 package com.tfamistaketracker.debug;
 
+import com.tfamistaketracker.RaidRoom;
+import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.TfaMistakeTrackerConfig;
 import com.tfamistaketracker.TfaMistakeTrackerPlugin;
 import com.tfamistaketracker.events.InRaidChanged;
@@ -11,6 +13,7 @@ import net.runelite.api.Actor;
 import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.Client;
 import net.runelite.api.GraphicsObject;
+import net.runelite.api.HeadIcon;
 import net.runelite.api.Hitsplat;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
@@ -68,6 +71,8 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
@@ -92,6 +97,7 @@ public class EventLogger {
     private final EventBus eventBus;
     private final KeyManager keyManager;
     private final TfaMistakeTrackerConfig config;
+    private final RaidState raidState;
     private final boolean developerMode;
 
     // Projectiles we've already logged, so each one is only logged once. Weak so finished projectiles are dropped.
@@ -99,17 +105,21 @@ public class EventLogger {
 
     private final AtomicInteger markerCount = new AtomicInteger();
 
+    // Last seen overhead prayer of each player, by name. Only accessed on the client thread.
+    private final Map<String, HeadIcon> overheadPrayers = new HashMap<>();
+
     private volatile LogFile logFile;
 
     private final HotkeyListener markerListener;
 
     @Inject
     public EventLogger(Client client, EventBus eventBus, KeyManager keyManager, TfaMistakeTrackerConfig config,
-                       @Named("developerMode") boolean developerMode) {
+                       RaidState raidState, @Named("developerMode") boolean developerMode) {
         this.client = client;
         this.eventBus = eventBus;
         this.keyManager = keyManager;
         this.config = config;
+        this.raidState = raidState;
         this.developerMode = developerMode;
 
         this.markerListener = new HotkeyListener(config::eventLoggerMarkerKey) {
@@ -162,8 +172,8 @@ public class EventLogger {
         Filepath dir = Filepath.Unchecked.getRooted(Paths.get(System.getProperty("user.dir"))).joinSegment(LOG_DIR_NAME);
         String fileName = "tfa-events-" + LocalDateTime.now().format(FILE_TIME_FORMAT) + ".log";
         LogFile f = new LogFile(dir, dir.joinSegment(fileName));
-        f.open();
         loggedProjectiles.clear();
+        overheadPrayers.clear();
         markerCount.set(0);
         logFile = f;
         log.debug("Event logger writing to {}", f.getAbsolutePath());
@@ -175,6 +185,7 @@ public class EventLogger {
 
         logFile = null;
         f.close();
+        overheadPrayers.clear();
         log.debug("Event logger closed {}", f.getAbsolutePath());
     }
 
@@ -224,10 +235,33 @@ public class EventLogger {
                     + counts);
         }
 
+        if (wv != null) {
+            logOverheadPrayerChanges(wv);
+        }
+
         LogFile f = logFile;
         if (f != null) {
             f.flush();
         }
+    }
+
+    private void logOverheadPrayerChanges(WorldView wv) {
+        for (Player player : wv.players()) {
+            if (player == null || player.getName() == null) continue;
+
+            String name = player.getName();
+            HeadIcon icon = player.getOverheadIcon();
+            boolean firstSeen = !overheadPrayers.containsKey(name);
+            HeadIcon prev = overheadPrayers.put(name, icon);
+            if (firstSeen || prev != icon) {
+                write("OVERHEAD_PRAYER", "player name=" + clean(Text.removeTags(name)) + " old="
+                        + (firstSeen ? "UNSEEN" : prayerName(prev)) + " new=" + prayerName(icon));
+            }
+        }
+    }
+
+    private static String prayerName(HeadIcon icon) {
+        return icon == null ? "NONE" : icon.name();
     }
 
     @Subscribe
@@ -298,56 +332,67 @@ public class EventLogger {
         write("PROJECTILE", "id=" + p.getId()
                 + " source=[" + actor(p.getSourceActor()) + "]"
                 + " target=[" + actor(p.getTargetActor()) + "]"
-                + " targetPoint=" + (targetPoint == null ? "null" : worldPoint(targetPoint))
+                + " targetPoint=[" + targetPoint(targetPoint) + "]"
                 + " remainingTicks=" + (p.getRemainingCycles() / TfaMistakeTrackerPlugin.CYCLES_PER_GAME_TICK)
                 + " " + localLocation(e.getPosition(), client.getTopLevelWorldView().getPlane()));
     }
 
     @Subscribe
     public void onGameObjectSpawned(GameObjectSpawned e) {
+        if (!shouldLogObject(e.getGameObject())) return;
         write("GAME_OBJECT_SPAWNED", tileObject(e.getGameObject()));
     }
 
     @Subscribe
     public void onGameObjectDespawned(GameObjectDespawned e) {
+        if (!shouldLogObject(e.getGameObject())) return;
         write("GAME_OBJECT_DESPAWNED", tileObject(e.getGameObject()));
     }
 
     @Subscribe
     public void onGroundObjectSpawned(GroundObjectSpawned e) {
+        if (!shouldLogObject(e.getGroundObject())) return;
         write("GROUND_OBJECT_SPAWNED", tileObject(e.getGroundObject()));
     }
 
     @Subscribe
     public void onGroundObjectDespawned(GroundObjectDespawned e) {
+        if (!shouldLogObject(e.getGroundObject())) return;
         write("GROUND_OBJECT_DESPAWNED", tileObject(e.getGroundObject()));
     }
 
     @Subscribe
     public void onWallObjectSpawned(WallObjectSpawned e) {
+        if (!shouldLogObject(e.getWallObject())) return;
         write("WALL_OBJECT_SPAWNED", tileObject(e.getWallObject()));
     }
 
     @Subscribe
     public void onWallObjectDespawned(WallObjectDespawned e) {
+        if (!shouldLogObject(e.getWallObject())) return;
         write("WALL_OBJECT_DESPAWNED", tileObject(e.getWallObject()));
     }
 
     @Subscribe
     public void onDecorativeObjectSpawned(DecorativeObjectSpawned e) {
+        if (!shouldLogObject(e.getDecorativeObject())) return;
         write("DECORATIVE_OBJECT_SPAWNED", tileObject(e.getDecorativeObject()));
     }
 
     @Subscribe
     public void onDecorativeObjectDespawned(DecorativeObjectDespawned e) {
+        if (!shouldLogObject(e.getDecorativeObject())) return;
         write("DECORATIVE_OBJECT_DESPAWNED", tileObject(e.getDecorativeObject()));
     }
 
     @Subscribe
     public void onHitsplatApplied(HitsplatApplied e) {
         Hitsplat h = e.getHitsplat();
+        String prayer = e.getActor() instanceof Player
+                ? " prayer=" + prayerName(((Player) e.getActor()).getOverheadIcon())
+                : "";
         write("HITSPLAT", actor(e.getActor()) + " type=" + h.getHitsplatType() + " amount=" + h.getAmount()
-                + " mine=" + h.isMine() + " others=" + h.isOthers() + " " + actorLocation(e.getActor()));
+                + " mine=" + h.isMine() + " others=" + h.isOthers() + prayer + " " + actorLocation(e.getActor()));
     }
 
     @Subscribe
@@ -424,7 +469,7 @@ public class EventLogger {
     }
 
     private String npc(NPC npc) {
-        return "id=" + npc.getId() + " name=" + clean(npc.getName()) + " index=" + npc.getIndex()
+        return "id=" + npc.getId() + " name=" + clean(Text.removeTags(npc.getName())) + " index=" + npc.getIndex()
                 + " size=" + (npc.getComposition() == null ? "?" : npc.getComposition().getSize());
     }
 
@@ -433,11 +478,11 @@ public class EventLogger {
             return "null";
         } else if (actor instanceof NPC) {
             NPC npc = (NPC) actor;
-            return "npc id=" + npc.getId() + " name=" + clean(npc.getName()) + " index=" + npc.getIndex();
+            return "npc id=" + npc.getId() + " name=" + clean(Text.removeTags(npc.getName())) + " index=" + npc.getIndex();
         } else if (actor instanceof Player) {
-            return "player name=" + clean(actor.getName());
+            return "player name=" + clean(Text.removeTags(actor.getName()));
         }
-        return "actor name=" + clean(actor.getName());
+        return "actor name=" + clean(Text.removeTags(actor.getName()));
     }
 
     private String actorLocation(Actor actor) {
@@ -445,6 +490,43 @@ public class EventLogger {
         LocalPoint lp = actor.getLocalLocation();
         WorldPoint instance = actor.getWorldLocation();
         return localLocation(lp, instance == null ? client.getTopLevelWorldView().getPlane() : instance.getPlane());
+    }
+
+    /**
+     * Object spawns flood on every region load, so only log them in the raid. Outside the raid, both the local player
+     * and the object must be in a raid room: a room's objects spawn during its loading screen, before the raid state
+     * has changed, but a lobby scene load also includes the neighbouring raid regions.
+     */
+    private boolean shouldLogObject(TileObject object) {
+        if (raidState.isInRaid()) return true;
+
+        Player local = client.getLocalPlayer();
+        if (local == null) return false;
+
+        return isRaidRoom(local.getLocalLocation(), local.getWorldLocation().getPlane())
+                && isRaidRoom(object.getLocalLocation(), object.getPlane());
+    }
+
+    private boolean isRaidRoom(LocalPoint lp, int plane) {
+        if (lp == null) return false;
+
+        WorldPoint template = WorldPoint.fromLocalInstance(client, lp, plane);
+        RaidRoom room = RaidRoom.forLocation(template.getRegionID(), template.getPlane());
+        return room != null && room != RaidRoom.LOBBY;
+    }
+
+    /**
+     * The projectile target point is in instance coords, so convert it to template coords like the other locations.
+     */
+    private String targetPoint(WorldPoint targetPoint) {
+        if (targetPoint == null) return "null";
+
+        LocalPoint lp = LocalPoint.fromWorld(client.getTopLevelWorldView(), targetPoint);
+        if (lp == null) {
+            // Not in the scene, so it can't be converted
+            return "instance " + worldPoint(targetPoint);
+        }
+        return localLocation(lp, targetPoint.getPlane());
     }
 
     private String tileObject(TileObject object) {
@@ -485,6 +567,7 @@ public class EventLogger {
 
         // Only accessed on the executor thread
         private BufferedWriter writer;
+        private boolean openFailed;
 
         LogFile(Filepath dir, Filepath file) {
             this.dir = dir;
@@ -492,20 +575,24 @@ public class EventLogger {
             this.absolutePath = Filepath.Unchecked.getPath(file).toAbsolutePath().toString();
         }
 
-        void open() {
-            executor.execute(() -> {
-                try {
-                    dir.createDirectories();
-                    writer = file.openBufferedWriter();
-                } catch (IOException e) {
-                    log.error("Unable to open event log " + absolutePath, e);
-                }
-            });
+        // Only called on the executor thread. Opens the file on the first write so no empty files are created.
+        private boolean ensureOpen() {
+            if (writer != null) return true;
+            if (openFailed) return false;
+            try {
+                dir.createDirectories();
+                writer = file.openBufferedWriter();
+                return true;
+            } catch (IOException e) {
+                log.error("Unable to open event log " + absolutePath, e);
+                openFailed = true;
+                return false;
+            }
         }
 
         void write(String line) {
             executor.execute(() -> {
-                if (writer == null) return;
+                if (!ensureOpen()) return;
                 try {
                     writer.write(line);
                     writer.newLine();

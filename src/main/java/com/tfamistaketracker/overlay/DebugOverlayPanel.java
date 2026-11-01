@@ -20,6 +20,7 @@ import javax.inject.Named;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.util.Set;
 
 /**
  * This is for testing with a visual aid
@@ -66,18 +67,22 @@ public class DebugOverlayPanel extends OverlayPanel {
         // Region of the local player, used to find the region IDs for each RaidRoom
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Region")
-                .right(String.valueOf(getRegion()))
+                .right(getRegionText())
                 .build());
 
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Room")
-                .right(String.valueOf(raidState.getCurrentRoom()))
+                .right(getRoomText())
                 .build());
 
         if (raidState.isInRaid()) {
             panelComponent.getChildren().add(TitleComponent.builder()
                     .text("In Raid")
                     .color(Color.GREEN)
+                    .build());
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Grace Ticks")
+                    .right(String.valueOf(raidState.getRaidLeaveTicks()))
                     .build());
         } else {
             panelComponent.getChildren().add(TitleComponent.builder()
@@ -86,14 +91,19 @@ public class DebugOverlayPanel extends OverlayPanel {
                     .build());
         }
 
+        // Raider names read from the varcs, and whether each one is actually loaded as a raider
+        Set<String> raiderNames = raidState.getRaiderNames();
         panelComponent.getChildren().add(TitleComponent.builder()
-                .text("Raiders:")
+                .text("Raiders: " + raidState.getRaiders().size() + "/" + raiderNames.size())
                 .color(raidState.getRaiders().isEmpty() ? Color.RED : Color.GREEN)
                 .build());
 
-        raidState.getRaiders().keySet().forEach(name -> {
+        raiderNames.forEach(name -> {
+            boolean loaded = raidState.getRaiders().containsKey(name);
             panelComponent.getChildren().add(LineComponent.builder()
                     .left(name)
+                    .right(loaded ? "loaded" : "missing")
+                    .rightColor(loaded ? Color.GREEN : Color.RED)
                     .build());
         });
 
@@ -124,14 +134,22 @@ public class DebugOverlayPanel extends OverlayPanel {
         return super.render(graphics);
     }
 
-    private int getRegion() {
+    private String getRoomText() {
+        if (raidState.getCurrentRoom() != null) {
+            return raidState.getCurrentRoom().name();
+        }
+        return raidState.isInRaid() ? "unknown" : "null";
+    }
+
+    private String getRegionText() {
         Player localPlayer = client.getLocalPlayer();
-        if (localPlayer == null) return -1;
+        if (localPlayer == null) return "-1";
 
         LocalPoint localPoint = localPlayer.getLocalLocation();
-        if (localPoint == null) return -1;
+        if (localPoint == null) return "-1";
 
-        return WorldPoint.fromLocalInstance(client, localPoint).getRegionID();
+        WorldPoint location = WorldPoint.fromLocalInstance(client, localPoint);
+        return location.getRegionID() + " p" + location.getPlane();
     }
 
     private void renderMistakeDetector(String name, boolean isOn) {

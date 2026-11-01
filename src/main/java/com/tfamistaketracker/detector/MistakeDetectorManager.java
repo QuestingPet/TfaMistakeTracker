@@ -39,8 +39,7 @@ import java.util.List;
 @Singleton
 public class MistakeDetectorManager {
 
-    // TODO: Verify the TFA wipe game message. ToA used "Your party failed to complete the challenge"
-    private static final String WIPE_GAME_MESSAGE = null;
+    private static final String WIPE_GAME_MESSAGE = "You failed to survive the Fractured Archive";
 
     private final Client client;
     private final EventBus eventBus;
@@ -137,7 +136,6 @@ public class MistakeDetectorManager {
 
     @Subscribe
     public void onChatMessage(ChatMessage event) {
-        if (WIPE_GAME_MESSAGE == null) return;
         if (event.getType() != ChatMessageType.GAMEMESSAGE) return;
 
         String message = Text.removeTags(event.getMessage());
