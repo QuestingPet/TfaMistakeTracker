@@ -18,9 +18,9 @@ public enum TfaMistake {
     ARCHIVE_GUARDIAN_MELEE("Archive Guardian Melee", TfaMistakeTrackerConfig::archiveGuardianMeleeMessage,
             "Ow that hurt!", ""),
     ARCHIVE_GUARDIAN_RANGE("Archive Guardian Range", TfaMistakeTrackerConfig::archiveGuardianRangeMessage,
-            "I'm getting rocked!", ""),
+            "I got rocked!", ""),
     ARCHIVE_GUARDIAN_MUSHROOM("Archive Guardian Mushroom", TfaMistakeTrackerConfig::archiveGuardianMushroomMessage,
-            "*cough* *cough*", ""),
+            "*Cough*", ""),
     ARCHIVE_GUARDIAN_VINE("Archive Guardian Vine", TfaMistakeTrackerConfig::archiveGuardianVineMessage,
             "Ahh! Tentacles!", ""),
     ;

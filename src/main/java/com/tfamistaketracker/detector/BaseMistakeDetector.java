@@ -14,6 +14,7 @@ import net.runelite.api.Client;
 import net.runelite.api.Constants;
 import net.runelite.api.GraphicsObject;
 import net.runelite.api.Projectile;
+import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.eventbus.EventBus;
 
@@ -119,19 +120,28 @@ public abstract class BaseMistakeDetector {
     }
 
     /**
-     * This method computes the WorldPoints in a 3x3 area given a center point.
+     * Computes the WorldPoints in the given area, expanded outward by the given number of tiles in every direction.
+     * For example, a 1x1 area with an expansion of 1 is the 3x3 area centred on it.
      *
-     * @param center The center point of the 3x3 area
+     * @param area             The area, e.g. an NPC's footprint
+     * @param tilesToExpandBy The number of tiles to expand the area outward by
+     * @return The set of WorldPoints in the expanded area
+     */
+    protected Set<WorldPoint> computeTilesAround(WorldArea area, int tilesToExpandBy) {
+        return ImmutableSet.copyOf(new WorldArea(area.getX() - tilesToExpandBy, area.getY() - tilesToExpandBy,
+                area.getWidth() + 2 * tilesToExpandBy, area.getHeight() + 2 * tilesToExpandBy,
+                area.getPlane()).toWorldPointList());
+    }
+
+    /**
+     * Computes the WorldPoints within the given number of tiles of the center, e.g. 1 tile is the 3x3 centred on it.
+     *
+     * @param center          The center tile
+     * @param tilesToExpandBy The number of tiles to expand outward from the center by
      * @return The set of WorldPoints around and including the center
      */
-    protected Set<WorldPoint> compute3By3TilesFromCenter(WorldPoint center) {
-        WorldPoint west = center.dx(-1);
-        WorldPoint east = center.dx(1);
-
-        return ImmutableSet.of(
-                west, center, east,
-                west.dy(-1), center.dy(-1), east.dy(-1),
-                west.dy(1), center.dy(1), east.dy(1));
+    protected Set<WorldPoint> computeTilesAround(WorldPoint center, int tilesToExpandBy) {
+        return computeTilesAround(new WorldArea(center, 1, 1), tilesToExpandBy);
     }
 
     /**

@@ -6,15 +6,14 @@ import com.tfamistaketracker.RaidRoom;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
-import com.tfamistaketracker.detector.tracker.DelayedObjectsTracker;
+import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
+import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.HeadIcon;
 import net.runelite.api.NPC;
-import net.runelite.api.coords.WorldArea;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameTick;
@@ -30,7 +29,6 @@ import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Singleton;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,45 +54,39 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     private static final Set<Integer> GUARDIAN_IDS = ImmutableSet.of(NpcID.TFA_GUARDIAN,
             NpcID.TFA_GUARDIAN_UNSHIELDED);
 
-    private static final Map<Integer, HeadIcon> RANGE_ATTACKS = ImmutableMap.of(
-            SpotanimID.VFX_GUARDIAN_RANGED_PROJANIM01, HeadIcon.RANGED);
+    private static final Map<Integer, OverheadTracker.Attack> RANGE_ATTACKS = ImmutableMap.of(
+            SpotanimID.VFX_GUARDIAN_RANGED_PROJANIM01,
+            OverheadTracker.Attack.of(HeadIcon.RANGED, OverheadTracker.PrayerCheck.ANIMATION));
 
     private static final int SLAM_DISTANCE = 1;
-    private static final int MUSHROOM_DISTANCE = 1;
     private static final int VINE_DISTANCE = 1;
+    private static final int MUSHROOM_DISTANCE = 1;
     private static final int MELEE_HIT_DELAY_IN_TICKS = 1;
+    private static final int MUSHROOM_HIT_DELAY_IN_TICKS = 1;
 
     private NPC guardian;
+    // Overheads are only final on GameTick, since NPC animations can fire before player updates within a tick
+    private boolean isRangeAttackStarting;
 
-    // The guardian's footprint on the tick he dropped down, or null
-    private WorldArea slamArea;
-
-    private final DelayedObjectsTracker<WorldArea> meleeAreas = new DelayedObjectsTracker<>();
+    private final InstantHitTilesTracker slamHitTiles = new InstantHitTilesTracker();
+    private final DelayedHitTilesTracker meleeHitTiles = new DelayedHitTilesTracker();
     private final OverheadTracker rangeOverheadTracker = new OverheadTracker(RANGE_ATTACKS);
-
-    // Mushrooms poison a tick after they explode
-    private final Set<WorldPoint> mushroomsExploding;
-    private final Set<WorldPoint> mushroomsExploded;
-
-    private final Set<WorldPoint> vineAttackTiles;
+    private final DelayedHitTilesTracker mushroomHitTiles = new DelayedHitTilesTracker();
+    private final InstantHitTilesTracker vineHitTiles = new InstantHitTilesTracker();
 
     public ArchiveGuardianDetector() {
         guardian = null;
-        slamArea = null;
-        mushroomsExploding = new HashSet<>();
-        mushroomsExploded = new HashSet<>();
-        vineAttackTiles = new HashSet<>();
     }
 
     @Override
     public void cleanup() {
         guardian = null;
-        slamArea = null;
-        meleeAreas.clear();
+        isRangeAttackStarting = false;
+        slamHitTiles.clear();
+        meleeHitTiles.clear();
         rangeOverheadTracker.clear();
-        mushroomsExploding.clear();
-        mushroomsExploded.clear();
-        vineAttackTiles.clear();
+        mushroomHitTiles.clear();
+        vineHitTiles.clear();
     }
 
     @Override
@@ -106,11 +98,11 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     public List<TfaMistake> detectMistakes(@NonNull Raider raider) {
         List<TfaMistake> mistakes = new ArrayList<>();
 
-        if (isSlamHit(raider)) {
+        if (slamHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(ARCHIVE_GUARDIAN_SLAM);
         }
 
-        if (isMeleeHit(raider)) {
+        if (meleeHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(ARCHIVE_GUARDIAN_MELEE);
         }
 
@@ -118,11 +110,11 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
             mistakes.add(ARCHIVE_GUARDIAN_RANGE);
         }
 
-        if (isWithinDistance(raider, mushroomsExploded, MUSHROOM_DISTANCE)) {
+        if (mushroomHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(ARCHIVE_GUARDIAN_MUSHROOM);
         }
 
-        if (isWithinDistance(raider, vineAttackTiles, VINE_DISTANCE)) {
+        if (vineHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(ARCHIVE_GUARDIAN_VINE);
         }
 
@@ -131,18 +123,6 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
 
     @Override
     public void afterDetect() {
-        slamArea = null;
-
-        mushroomsExploded.clear();
-        mushroomsExploded.addAll(mushroomsExploding);
-        mushroomsExploding.clear();
-
-        vineAttackTiles.clear();
-    }
-
-    private boolean isSlamHit(Raider raider) {
-        WorldPoint location = raider.getPreviousWorldLocation();
-        return slamArea != null && location != null && slamArea.distanceTo(location) <= SLAM_DISTANCE;
     }
 
     private boolean isRangeHit(Raider raider) {
@@ -150,38 +130,20 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
             return false;
         }
 
-        return rangeOverheadTracker.getActiveProjectileForRaider(raider) != null &&
-                rangeOverheadTracker.didMissPrayer(raider);
-    }
-
-    private boolean isMeleeHit(Raider raider) {
-        WorldPoint location = raider.getPreviousWorldLocation();
-        if (location == null) return false;
-
-        for (WorldArea area : meleeAreas.getActiveObjects()) {
-            if (area.contains(location)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isWithinDistance(Raider raider, Set<WorldPoint> tiles, int distance) {
-        WorldPoint location = raider.getPreviousWorldLocation();
-        if (location == null) return false;
-
-        for (WorldPoint tile : tiles) {
-            if (tile.getPlane() == location.getPlane() && location.distanceTo2D(tile) <= distance) {
-                return true;
-            }
-        }
-        return false;
+        return rangeOverheadTracker.didMissPrayer(raider);
     }
 
     @Subscribe
     public void onGameTick(GameTick event) {
-        meleeAreas.onGameTick(client.getTickCount());
+        slamHitTiles.onGameTick(client.getTickCount());
+        meleeHitTiles.onGameTick(client.getTickCount());
         rangeOverheadTracker.onGameTick(client.getTickCount());
+        if (isRangeAttackStarting && guardian != null) {
+            rangeOverheadTracker.snapshotOverheads(guardian, raidState.getRaiders().values());
+        }
+        isRangeAttackStarting = false;
+        mushroomHitTiles.onGameTick(client.getTickCount());
+        vineHitTiles.onGameTick(client.getTickCount());
     }
 
     @Subscribe
@@ -191,13 +153,16 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
 
         if (actor == guardian) {
             if (guardian.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_IDLE_TO_GROUND01) {
-                slamArea = guardian.getWorldArea();
+                computeTilesAround(guardian.getWorldArea(), SLAM_DISTANCE).forEach(slamHitTiles::add);
+            } else if (guardian.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_RANGE_ATTACK01) {
+                isRangeAttackStarting = true;
             } else if (guardian.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_MELEE_ATTACK01) {
-                meleeAreas.put(client.getTickCount() + MELEE_HIT_DELAY_IN_TICKS, guardian.getWorldArea());
+                meleeHitTiles.putAll(client.getTickCount() + MELEE_HIT_DELAY_IN_TICKS,
+                        computeTilesAround(guardian.getWorldArea(), 0));
             }
         } else if (((NPC) actor).getId() == NpcID.ARCHIVE_GUARDIAN_TENTACLE &&
                 actor.getAnimation() == AnimationID.NPC_GUARDIAN_ARCHIVE_TENTACLE_ATTACK01) {
-            vineAttackTiles.add(actor.getWorldLocation());
+            computeTilesAround(actor.getWorldArea(), VINE_DISTANCE).forEach(vineHitTiles::add);
         }
     }
 
@@ -205,13 +170,14 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     public void onProjectileMoved(ProjectileMoved event) {
         if (!RANGE_ATTACKS.containsKey(event.getProjectile().getId())) return;
 
-        rangeOverheadTracker.trackProjectile(event, getActivationTick(event.getProjectile()));
+        rangeOverheadTracker.trackProjectile(event, client.getTickCount());
     }
 
     @Subscribe
     public void onGameObjectSpawned(GameObjectSpawned event) {
         if (event.getGameObject().getId() == ObjectID.TFA_GUARDIAN_MUSHROOM_DESPAWN) {
-            mushroomsExploding.add(event.getGameObject().getWorldLocation());
+            mushroomHitTiles.putAll(client.getTickCount() + MUSHROOM_HIT_DELAY_IN_TICKS,
+                    computeTilesAround(event.getGameObject().getWorldLocation(), MUSHROOM_DISTANCE));
         }
     }
 

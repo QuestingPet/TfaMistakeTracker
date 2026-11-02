@@ -17,6 +17,7 @@ import net.runelite.api.Constants;
 import net.runelite.api.Player;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.config.ConfigItemDescriptor;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -29,6 +30,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.swing.SwingUtilities;
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -60,6 +62,13 @@ public class TfaMistakeTrackerPlugin extends Plugin {
     private EventBus eventBus;
 
     @Inject
+    private ConfigManager configManager;
+
+    @Inject
+    @Named("developerMode")
+    private boolean developerMode;
+
+    @Inject
     private MistakeDetectorManager mistakeDetectorManager;
 
     @Inject
@@ -89,6 +98,10 @@ public class TfaMistakeTrackerPlugin extends Plugin {
 
     @Override
     protected void startUp() throws Exception {
+        if (developerMode) {
+            resetMistakeMessages();
+        }
+
         // Must be set before the panel is created, since the panel reads the mistake state on creation
         mistakeStateWriter.setPluginDirectory(getPluginDirectory());
 
@@ -239,6 +252,16 @@ public class TfaMistakeTrackerPlugin extends Plugin {
         if ("resetDetectors".equals(event.getKey())) {
             log.debug("Resetting detectors");
             mistakeDetectorManager.reset();
+        }
+    }
+
+    // DEBUG ONLY -- remove before publishing. Resets all mistake messages to their in-code defaults while they change.
+    private void resetMistakeMessages() {
+        for (ConfigItemDescriptor item : configManager.getConfigDescriptor(config).getItems()) {
+            String key = item.getItem().keyName();
+            if (key.endsWith("Message")) {
+                configManager.unsetConfiguration(CONFIG_GROUP, key);
+            }
         }
     }
 
