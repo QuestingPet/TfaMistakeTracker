@@ -11,6 +11,18 @@ import java.util.Arrays;
 public enum TfaMistake {
     // Deaths
     DEATH("Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death.png"),
+
+    // Archive Guardian
+    ARCHIVE_GUARDIAN_SLAM("Archive Guardian Slam", TfaMistakeTrackerConfig::archiveGuardianSlamMessage,
+            "I'm getting slammed!", ""),
+    ARCHIVE_GUARDIAN_MELEE("Archive Guardian Melee", TfaMistakeTrackerConfig::archiveGuardianMeleeMessage,
+            "Ow that hurt!", ""),
+    ARCHIVE_GUARDIAN_RANGE("Archive Guardian Range", TfaMistakeTrackerConfig::archiveGuardianRangeMessage,
+            "I'm getting rocked!", ""),
+    ARCHIVE_GUARDIAN_MUSHROOM("Archive Guardian Mushroom", TfaMistakeTrackerConfig::archiveGuardianMushroomMessage,
+            "*cough* *cough*", ""),
+    ARCHIVE_GUARDIAN_VINE("Archive Guardian Vine", TfaMistakeTrackerConfig::archiveGuardianVineMessage,
+            "Ahh! Tentacles!", ""),
     ;
 
     private static final String FALLBACK_IMAGE_PATH = "death.png";

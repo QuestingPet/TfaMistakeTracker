@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.ActorSpotAnim;
 import net.runelite.api.Client;
+import net.runelite.api.GameObject;
 import net.runelite.api.GraphicsObject;
 import net.runelite.api.HeadIcon;
 import net.runelite.api.Hitsplat;
@@ -370,7 +371,10 @@ public class EventLogger {
     @Subscribe
     public void onGameObjectSpawned(GameObjectSpawned e) {
         if (!shouldLogObject(e.getGameObject())) return;
-        write("GAME_OBJECT_SPAWNED", tileObject(e.getGameObject()));
+        GameObject object = e.getGameObject();
+        write("GAME_OBJECT_SPAWNED", tileObject(object) + " size=" + object.sizeX() + "x" + object.sizeY()
+                + " sceneMin=" + object.getSceneMinLocation().getX() + "," + object.getSceneMinLocation().getY()
+                + " worldLoc=" + worldPoint(object.getWorldLocation()));
     }
 
     @Subscribe

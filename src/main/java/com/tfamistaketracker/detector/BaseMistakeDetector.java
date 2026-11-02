@@ -6,6 +6,7 @@ import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.tracker.VengeanceTracker;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import net.runelite.api.Actor;
@@ -43,10 +44,16 @@ public abstract class BaseMistakeDetector {
     @Setter
     protected VengeanceTracker vengeanceTracker;
 
+    @Getter
+    private boolean started;
+
     /**
      * Used to tell a detector to start listening for events.
      */
     public void startup() {
+        if (started) return;
+
+        started = true;
         cleanup();
         eventBus.register(this);
     }
@@ -55,6 +62,7 @@ public abstract class BaseMistakeDetector {
      * Shutdown and cleanup state. This is always called when the plugin is shutdown, or when a detector is finished.
      */
     public void shutdown() {
+        started = false;
         eventBus.unregister(this);
         cleanup();
     }

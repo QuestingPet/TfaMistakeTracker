@@ -21,6 +21,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This is for testing with a visual aid
@@ -124,6 +125,15 @@ public class DebugOverlayPanel extends OverlayPanel {
         for (BaseMistakeDetector mistakeDetector : mistakeDetectorManager.getMistakeDetectors()) {
             renderMistakeDetector(mistakeDetector.getClass().getSimpleName(), mistakeDetector.isDetectingMistakes());
         }
+
+        String started = mistakeDetectorManager.getMistakeDetectors().stream()
+                .filter(BaseMistakeDetector::isStarted)
+                .map(d -> d.getClass().getSimpleName().replace("Detector", ""))
+                .collect(Collectors.joining(", "));
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("Started")
+                .right(started.isEmpty() ? "none" : started)
+                .build());
 
         return super.render(graphics);
     }

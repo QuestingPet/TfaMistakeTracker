@@ -62,11 +62,74 @@ public interface TfaMistakeTrackerConfig extends Config {
         return TfaMistake.defaultDeathMessage();
     }
 
+    @ConfigSection(
+            name = "Archive Guardian Mistake Messages",
+            description = "Settings for the messages shown on Archive Guardian mistakes (separate multiple messages by \"|\").",
+            position = 4,
+            closedByDefault = true
+    )
+    String archiveGuardianMistakeSettings = "archiveGuardianMistakeSettings";
+
+    @ConfigItem(
+            keyName = "archiveGuardianSlamMessage",
+            name = "Archive Guardian Slam",
+            description = "Message to show when hit by the Archive Guardian's slam when he drops down.",
+            section = archiveGuardianMistakeSettings,
+            position = 0
+    )
+    default String archiveGuardianSlamMessage() {
+        return TfaMistake.ARCHIVE_GUARDIAN_SLAM.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "archiveGuardianMeleeMessage",
+            name = "Archive Guardian Melee",
+            description = "Message to show when hit by the Archive Guardian's melee attack while under him.",
+            section = archiveGuardianMistakeSettings,
+            position = 1
+    )
+    default String archiveGuardianMeleeMessage() {
+        return TfaMistake.ARCHIVE_GUARDIAN_MELEE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "archiveGuardianRangeMessage",
+            name = "Archive Guardian Range",
+            description = "Message to show when hit by the Archive Guardian's rock without praying range.",
+            section = archiveGuardianMistakeSettings,
+            position = 2
+    )
+    default String archiveGuardianRangeMessage() {
+        return TfaMistake.ARCHIVE_GUARDIAN_RANGE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "archiveGuardianMushroomMessage",
+            name = "Archive Guardian Mushroom",
+            description = "Message to show when caught in a mushroom explosion in the Archive Guardian room.",
+            section = archiveGuardianMistakeSettings,
+            position = 3
+    )
+    default String archiveGuardianMushroomMessage() {
+        return TfaMistake.ARCHIVE_GUARDIAN_MUSHROOM.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "archiveGuardianVineMessage",
+            name = "Archive Guardian Vine",
+            description = "Message to show when hit by a vine in the Archive Guardian room.",
+            section = archiveGuardianMistakeSettings,
+            position = 4
+    )
+    default String archiveGuardianVineMessage() {
+        return TfaMistake.ARCHIVE_GUARDIAN_VINE.getDefaultMessage();
+    }
+
     // DEBUG ONLY -- everything in this section is for development and must be removed before publishing
     @ConfigSection(
             name = "Debug",
             description = "Developer tools. Only work in developer mode.",
-            position = 4,
+            position = 5,
             closedByDefault = true
     )
     String debugSettings = "debugSettings";

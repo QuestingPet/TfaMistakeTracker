@@ -4,6 +4,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
+import com.tfamistaketracker.detector.boss.ArchiveGuardianDetector;
 import com.tfamistaketracker.detector.death.DeathDetector;
 import com.tfamistaketracker.detector.tracker.BaseRaidTracker;
 import com.tfamistaketracker.detector.tracker.VengeanceTracker;
@@ -61,11 +62,13 @@ public class MistakeDetectorManager {
                                   EventBus eventBus,
                                   RaidState raidState,
                                   VengeanceTracker vengeanceTracker,
+                                  ArchiveGuardianDetector archiveGuardianDetector,
                                   DeathDetector deathDetector) {
         this.raidTrackers = Arrays.asList(vengeanceTracker);
 
         // Order matters, since it's last write wins for which mistake gets put on overhead text. Death should be last.
         this.mistakeDetectors = new ArrayList<>(Arrays.asList(
+                archiveGuardianDetector,
                 deathDetector
         ));
 
@@ -83,8 +86,11 @@ public class MistakeDetectorManager {
         // Startup all raid trackers
         raidTrackers.forEach(BaseRaidTracker::startup);
 
-        // Startup any detectors that should be active in *all* rooms
-        mistakeDetectors.stream().filter(d -> d.getRaidRoom() == null).forEach(BaseMistakeDetector::startup);
+        // Startup any detectors that should be active in *all* rooms, or in the current room. The first room is entered
+        // before the manager starts listening for room changes.
+        mistakeDetectors.stream()
+                .filter(d -> d.getRaidRoom() == null || d.getRaidRoom() == raidstate.getCurrentRoom())
+                .forEach(BaseMistakeDetector::startup);
     }
 
     public void shutdown() {
