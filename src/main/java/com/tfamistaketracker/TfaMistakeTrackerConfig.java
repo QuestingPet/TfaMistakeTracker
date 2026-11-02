@@ -125,11 +125,148 @@ public interface TfaMistakeTrackerConfig extends Config {
         return TfaMistake.ARCHIVE_GUARDIAN_VINE.getDefaultMessage();
     }
 
+    @ConfigSection(
+            name = "Bork Mistake Messages",
+            description = "Settings for the messages shown on Bork mistakes (separate multiple messages by \"|\").",
+            position = 5,
+            closedByDefault = true
+    )
+    String borkMistakeSettings = "borkMistakeSettings";
+
+    @ConfigItem(
+            keyName = "borkStompMessage",
+            name = "Bork Stomp",
+            description = "Message to show when hit by a wave from Bork's stomp.",
+            section = borkMistakeSettings,
+            position = 0
+    )
+    default String borkStompMessage() {
+        return TfaMistake.BORK_STOMP.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "borkMeleeMessage",
+            name = "Bork Melee",
+            description = "Message to show when hit by Bork's melee attack without praying melee.",
+            section = borkMistakeSettings,
+            position = 1
+    )
+    default String borkMeleeMessage() {
+        return TfaMistake.BORK_MELEE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "borkSmorksAaMessage",
+            name = "Bork Smorks Auto Attack",
+            description = "Message to show when hit by The Smorks' ranged or magic attack without the matching prayer.",
+            section = borkMistakeSettings,
+            position = 2
+    )
+    default String borkSmorksAaMessage() {
+        return TfaMistake.BORK_SMORKS_AA.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "borkFireMessage",
+            name = "Bork Fire",
+            description = "Message to show when standing on fire in the Bork room.",
+            section = borkMistakeSettings,
+            position = 3
+    )
+    default String borkFireMessage() {
+        return TfaMistake.BORK_FIRE.getDefaultMessage();
+    }
+
+    @ConfigSection(
+            name = "Dreadnoth Mistake Messages",
+            description = "Settings for the messages shown on Dreadnoth mistakes (separate multiple messages by \"|\").",
+            position = 6,
+            closedByDefault = true
+    )
+    String dreadnothMistakeSettings = "dreadnothMistakeSettings";
+
+    @ConfigItem(
+            keyName = "dreadnothSlamMessage",
+            name = "Dreadnoth Slam",
+            description = "Message to show when hit by Dreadnoth's jump slam without praying melee.",
+            section = dreadnothMistakeSettings,
+            position = 0
+    )
+    default String dreadnothSlamMessage() {
+        return TfaMistake.DREADNOTH_SLAM.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "dreadnothRangeMessage",
+            name = "Dreadnoth Range",
+            description = "Message to show when hit by Dreadnoth's ranged attack without praying range.",
+            section = dreadnothMistakeSettings,
+            position = 1
+    )
+    default String dreadnothRangeMessage() {
+        return TfaMistake.DREADNOTH_RANGE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "dreadnothBloodPoolMessage",
+            name = "Dreadnoth Blood Pool",
+            description = "Message to show when standing in a blood pool in the Dreadnoth room.",
+            section = dreadnothMistakeSettings,
+            position = 2
+    )
+    default String dreadnothBloodPoolMessage() {
+        return TfaMistake.DREADNOTH_BLOOD_POOL.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "dreadnothBloodBallMessage",
+            name = "Dreadnoth Blood Ball",
+            description = "Message to show when hit by one of Dreadnoth's blood balls landing.",
+            section = dreadnothMistakeSettings,
+            position = 3
+    )
+    default String dreadnothBloodBallMessage() {
+        return TfaMistake.DREADNOTH_BLOOD_BALL.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "dreadnothLandedMessage",
+            name = "Dreadnoth Landed",
+            description = "Message to show when Dreadnoth lands on you.",
+            section = dreadnothMistakeSettings,
+            position = 4
+    )
+    default String dreadnothLandedMessage() {
+        return TfaMistake.DREADNOTH_LANDED.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "dreadnothJellyMessage",
+            name = "Dreadnoth Jelly",
+            description = "Message to show when hit by a jelly without praying melee.",
+            section = dreadnothMistakeSettings,
+            position = 5
+    )
+    default String dreadnothJellyMessage() {
+        return TfaMistake.DREADNOTH_JELLY.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "dreadnothInsideMessage",
+            name = "Dreadnoth Inside",
+            description = "Message to show when standing inside Dreadnoth.",
+            section = dreadnothMistakeSettings,
+            position = 6
+    )
+    default String dreadnothInsideMessage() {
+        return TfaMistake.DREADNOTH_INSIDE.getDefaultMessage();
+    }
+
     // DEBUG ONLY -- everything in this section is for development and must be removed before publishing
     @ConfigSection(
             name = "Debug",
             description = "Developer tools. Only work in developer mode.",
-            position = 5,
+            position = 7,
             closedByDefault = true
     )
     String debugSettings = "debugSettings";
@@ -148,12 +285,25 @@ public interface TfaMistakeTrackerConfig extends Config {
 
     @VisibleForDevtools
     @ConfigItem(
+            keyName = "debugTiles",
+            name = "Debug Tiles",
+            description = "Show the hit tiles, hazards and projectiles the detectors are tracking. Only works in " +
+                    "developer mode.",
+            section = debugSettings,
+            position = 1
+    )
+    default boolean debugTiles() {
+        return false;
+    }
+
+    @VisibleForDevtools
+    @ConfigItem(
             keyName = "eventLogger",
             name = "Event Logger",
             description = "Log game events and their ids to debug-logs/ in the working directory. Only works in " +
                     "developer mode.",
             section = debugSettings,
-            position = 1
+            position = 2
     )
     default boolean eventLogger() {
         return false;
@@ -165,7 +315,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Event Logger Scripts",
             description = "Also log every script that runs. Very noisy.",
             section = debugSettings,
-            position = 2
+            position = 3
     )
     default boolean eventLoggerScripts() {
         return false;
@@ -177,7 +327,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Event Logger Marker Key",
             description = "Press to write a numbered marker line into the event log.",
             section = debugSettings,
-            position = 3
+            position = 4
     )
     default Keybind eventLoggerMarkerKey() {
         return Keybind.NOT_SET;
@@ -189,7 +339,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Reset Detectors",
             description = "Toggle to recreate all mistake detectors, for picking up hotswapped changes.",
             section = debugSettings,
-            position = 4
+            position = 5
     )
     default boolean resetDetectors() {
         return false;

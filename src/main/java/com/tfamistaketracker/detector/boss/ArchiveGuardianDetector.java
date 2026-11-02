@@ -9,6 +9,7 @@ import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
+import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
@@ -18,8 +19,6 @@ import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.NpcChanged;
-import net.runelite.api.events.NpcDespawned;
-import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.ProjectileMoved;
 import net.runelite.api.gameval.AnimationID;
 import net.runelite.api.gameval.NpcID;
@@ -64,9 +63,10 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     private static final int MELEE_HIT_DELAY_IN_TICKS = 1;
     private static final int MUSHROOM_HIT_DELAY_IN_TICKS = 1;
 
-    private NPC guardian;
     // Overheads are only final on GameTick, since NPC animations can fire before player updates within a tick
-    private boolean isRangeAttackStarting;
+    private NPC rangeAttacker;
+    // Nothing in the room hurts once the guardian starts dying
+    private boolean isGuardianDead;
 
     private final InstantHitTilesTracker slamHitTiles = new InstantHitTilesTracker();
     private final DelayedHitTilesTracker meleeHitTiles = new DelayedHitTilesTracker();
@@ -75,13 +75,18 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     private final InstantHitTilesTracker vineHitTiles = new InstantHitTilesTracker();
 
     public ArchiveGuardianDetector() {
-        guardian = null;
+        rangeAttacker = null;
+        isGuardianDead = false;
     }
 
     @Override
     public void cleanup() {
-        guardian = null;
-        isRangeAttackStarting = false;
+        isGuardianDead = false;
+        clearTrackers();
+    }
+
+    private void clearTrackers() {
+        rangeAttacker = null;
         slamHitTiles.clear();
         meleeHitTiles.clear();
         rangeOverheadTracker.clear();
@@ -97,6 +102,9 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     @Override
     public List<TfaMistake> detectMistakes(@NonNull Raider raider) {
         List<TfaMistake> mistakes = new ArrayList<>();
+        if (isGuardianDead) {
+            return mistakes;
+        }
 
         if (slamHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(ARCHIVE_GUARDIAN_SLAM);
@@ -125,6 +133,16 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     public void afterDetect() {
     }
 
+    // DEBUG ONLY -- remove before publishing
+    @Override
+    public void renderDebugTiles(DebugTilesOverlay overlay) {
+        overlay.renderHitTiles(slamHitTiles);
+        overlay.renderHitTiles(meleeHitTiles);
+        overlay.renderProjectiles(rangeOverheadTracker);
+        overlay.renderHitTiles(mushroomHitTiles);
+        overlay.renderHitTiles(vineHitTiles);
+    }
+
     private boolean isRangeHit(Raider raider) {
         if (vengeanceTracker.didPopVengeance(raider)) {
             return false;
@@ -138,10 +156,10 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
         slamHitTiles.onGameTick(client.getTickCount());
         meleeHitTiles.onGameTick(client.getTickCount());
         rangeOverheadTracker.onGameTick(client.getTickCount());
-        if (isRangeAttackStarting && guardian != null) {
-            rangeOverheadTracker.snapshotOverheads(guardian, raidState.getRaiders().values());
+        if (rangeAttacker != null) {
+            rangeOverheadTracker.snapshotOverheads(rangeAttacker, raidState.getRaiders().values());
         }
-        isRangeAttackStarting = false;
+        rangeAttacker = null;
         mushroomHitTiles.onGameTick(client.getTickCount());
         vineHitTiles.onGameTick(client.getTickCount());
     }
@@ -149,59 +167,50 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     @Subscribe
     public void onAnimationChanged(AnimationChanged event) {
         Actor actor = event.getActor();
-        if (!(actor instanceof NPC)) return;
+        if (!(actor instanceof NPC) || isGuardianDead) return;
 
-        if (actor == guardian) {
-            if (guardian.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_IDLE_TO_GROUND01) {
-                computeTilesAround(guardian.getWorldArea(), SLAM_DISTANCE).forEach(slamHitTiles::add);
-            } else if (guardian.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_RANGE_ATTACK01) {
-                isRangeAttackStarting = true;
-            } else if (guardian.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_MELEE_ATTACK01) {
+        NPC npc = (NPC) actor;
+        if (GUARDIAN_IDS.contains(npc.getId())) {
+            if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_DEATH01) {
+                onGuardianDeath();
+            } else if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_IDLE_TO_GROUND01) {
+                computeTilesAround(npc.getWorldArea(), SLAM_DISTANCE).forEach(slamHitTiles::add);
+            } else if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_RANGE_ATTACK01) {
+                rangeAttacker = npc;
+            } else if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_MELEE_ATTACK01) {
                 meleeHitTiles.putAll(client.getTickCount() + MELEE_HIT_DELAY_IN_TICKS,
-                        computeTilesAround(guardian.getWorldArea(), 0));
+                        computeTilesAround(npc.getWorldArea(), 0));
             }
-        } else if (((NPC) actor).getId() == NpcID.ARCHIVE_GUARDIAN_TENTACLE &&
-                actor.getAnimation() == AnimationID.NPC_GUARDIAN_ARCHIVE_TENTACLE_ATTACK01) {
+        } else if (npc.getId() == NpcID.ARCHIVE_GUARDIAN_TENTACLE &&
+                npc.getAnimation() == AnimationID.NPC_GUARDIAN_ARCHIVE_TENTACLE_ATTACK01) {
             computeTilesAround(actor.getWorldArea(), VINE_DISTANCE).forEach(vineHitTiles::add);
         }
     }
 
     @Subscribe
     public void onProjectileMoved(ProjectileMoved event) {
-        if (!RANGE_ATTACKS.containsKey(event.getProjectile().getId())) return;
+        if (!RANGE_ATTACKS.containsKey(event.getProjectile().getId()) || isGuardianDead) return;
 
         rangeOverheadTracker.trackProjectile(event, client.getTickCount());
     }
 
     @Subscribe
     public void onGameObjectSpawned(GameObjectSpawned event) {
-        if (event.getGameObject().getId() == ObjectID.TFA_GUARDIAN_MUSHROOM_DESPAWN) {
+        if (event.getGameObject().getId() == ObjectID.TFA_GUARDIAN_MUSHROOM_DESPAWN && !isGuardianDead) {
             mushroomHitTiles.putAll(client.getTickCount() + MUSHROOM_HIT_DELAY_IN_TICKS,
                     computeTilesAround(event.getGameObject().getWorldLocation(), MUSHROOM_DISTANCE));
         }
     }
 
     @Subscribe
-    public void onNpcSpawned(NpcSpawned event) {
-        if (GUARDIAN_IDS.contains(event.getNpc().getId())) {
-            guardian = event.getNpc();
-        }
-    }
-
-    @Subscribe
     public void onNpcChanged(NpcChanged event) {
-        if (GUARDIAN_IDS.contains(event.getNpc().getId())) {
-            guardian = event.getNpc();
-        } else if (event.getNpc() == guardian) {
-            // Changed to its dead form
-            guardian = null;
+        if (event.getNpc().getId() == NpcID.TFA_GUARDIAN_DEAD) {
+            onGuardianDeath();
         }
     }
 
-    @Subscribe
-    public void onNpcDespawned(NpcDespawned event) {
-        if (event.getNpc() == guardian) {
-            guardian = null;
-        }
+    private void onGuardianDeath() {
+        isGuardianDead = true;
+        clearTrackers();
     }
 }

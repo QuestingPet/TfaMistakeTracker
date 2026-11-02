@@ -6,6 +6,7 @@ import com.tfamistaketracker.TfaMistakeTrackerPlugin;
 import com.tfamistaketracker.debug.EventLogger;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.MistakeDetectorManager;
+import com.tfamistaketracker.events.DetectorErrored;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 import net.runelite.api.coords.LocalPoint;
@@ -64,6 +65,16 @@ public class DebugOverlayPanel extends OverlayPanel {
         panelComponent.getChildren().add(TitleComponent.builder()
                 .text("Game Tick: " + client.getTickCount())
                 .build());
+
+        DetectorErrored lastError = mistakeDetectorManager.getLastError();
+        if (lastError != null) {
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Errors: " + mistakeDetectorManager.getErrorCount() + " (last: " + lastError.getSource() + " "
+                            + lastError.getException().getClass().getSimpleName() + " @ tick " + lastError.getTick()
+                            + ")")
+                    .leftColor(Color.RED)
+                    .build());
+        }
 
         panelComponent.getChildren().add(LineComponent.builder()
                 .left("Region")

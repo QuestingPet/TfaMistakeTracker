@@ -8,6 +8,7 @@ import com.tfamistaketracker.events.InRaidChanged;
 import com.tfamistaketracker.events.RaidEntered;
 import com.tfamistaketracker.mistakestate.MistakeStateWriter;
 import com.tfamistaketracker.overlay.DebugOverlayPanel;
+import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import com.tfamistaketracker.panel.TfaMistakeTrackerPanel;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -87,6 +88,9 @@ public class TfaMistakeTrackerPlugin extends Plugin {
     private DebugOverlayPanel debugOverlayPanel;
 
     @Inject
+    private DebugTilesOverlay debugTilesOverlay;
+
+    @Inject
     private EventLogger eventLogger;
 
     // UI fields
@@ -120,6 +124,7 @@ public class TfaMistakeTrackerPlugin extends Plugin {
 
         // Add debug overlays and logging
         overlayManager.add(debugOverlayPanel);
+        overlayManager.add(debugTilesOverlay);
         eventLogger.startUp();
 
         // Start raid state detection
@@ -139,6 +144,7 @@ public class TfaMistakeTrackerPlugin extends Plugin {
 
         // Remove debug overlays and logging
         overlayManager.remove(debugOverlayPanel);
+        overlayManager.remove(debugTilesOverlay);
         eventLogger.shutDown();
 
         // Remove UI

@@ -23,6 +23,23 @@ public enum TfaMistake {
             "*Cough*", ""),
     ARCHIVE_GUARDIAN_VINE("Archive Guardian Vine", TfaMistakeTrackerConfig::archiveGuardianVineMessage,
             "Ahh! Tentacles!", ""),
+
+    // Bork
+    BORK_STOMP("Bork Stomp", TfaMistakeTrackerConfig::borkStompMessage, "He's stomping!", ""),
+    BORK_MELEE("Bork Melee", TfaMistakeTrackerConfig::borkMeleeMessage, "He's hitting me!", ""),
+    BORK_SMORKS_AA("Bork Smorks Auto Attack", TfaMistakeTrackerConfig::borkSmorksAaMessage,
+            "Whoops wrong prayer!", ""),
+    BORK_FIRE("Bork Fire", TfaMistakeTrackerConfig::borkFireMessage, "It burns!", ""),
+
+    // Dreadnoth
+    DREADNOTH_SLAM("Dreadnoth Slam", TfaMistakeTrackerConfig::dreadnothSlamMessage, "It's an earthquake!", ""),
+    DREADNOTH_RANGE("Dreadnoth Range", TfaMistakeTrackerConfig::dreadnothRangeMessage, "I'm hit!", ""),
+    DREADNOTH_BLOOD_POOL("Dreadnoth Blood Pool", TfaMistakeTrackerConfig::dreadnothBloodPoolMessage, "I'm drowning in blood!", ""),
+    DREADNOTH_BLOOD_BALL("Dreadnoth Blood Ball", TfaMistakeTrackerConfig::dreadnothBloodBallMessage,
+            "Who put that there?", ""),
+    DREADNOTH_LANDED("Dreadnoth Landed", TfaMistakeTrackerConfig::dreadnothLandedMessage, "Bonk!", ""),
+    DREADNOTH_JELLY("Dreadnoth Jelly", TfaMistakeTrackerConfig::dreadnothJellyMessage, "I'm smited!", ""),
+    DREADNOTH_INSIDE("Dreadnoth Inside", TfaMistakeTrackerConfig::dreadnothInsideMessage, "What's inside?", ""),
     ;
 
     private static final String FALLBACK_IMAGE_PATH = "death.png";

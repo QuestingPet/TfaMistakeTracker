@@ -4,6 +4,7 @@ import com.tfamistaketracker.RaidRoom;
 import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.TfaMistakeTrackerConfig;
 import com.tfamistaketracker.TfaMistakeTrackerPlugin;
+import com.tfamistaketracker.events.DetectorErrored;
 import com.tfamistaketracker.events.InRaidChanged;
 import com.tfamistaketracker.events.RaidEntered;
 import com.tfamistaketracker.events.RaidRoomChanged;
@@ -90,6 +91,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class EventLogger {
 
     private static final String LOG_DIR_NAME = "debug-logs";
+    private static final int ERROR_STACK_FRAMES = 5;
     private static final DateTimeFormatter FILE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final Client client;
@@ -220,6 +222,17 @@ public class EventLogger {
     @Subscribe
     public void onRaidEntered(RaidEntered e) {
         write("RAID_ENTERED", "raiders=" + e.getRaiderNames());
+    }
+
+    @Subscribe
+    public void onDetectorErrored(DetectorErrored e) {
+        StringBuilder frames = new StringBuilder();
+        StackTraceElement[] stackTrace = e.getException().getStackTrace();
+        for (int i = 0; i < Math.min(ERROR_STACK_FRAMES, stackTrace.length); i++) {
+            frames.append(i == 0 ? "" : " | ").append(stackTrace[i]);
+        }
+        write("ERROR", "source=" + e.getSource() + " exception=" + e.getException().getClass().getSimpleName()
+                + " message=" + clean(String.valueOf(e.getException().getMessage())) + " at=" + frames);
     }
 
     // Game events

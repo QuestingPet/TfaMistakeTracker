@@ -5,9 +5,12 @@ import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.boss.ArchiveGuardianDetector;
+import com.tfamistaketracker.detector.boss.BorkDetector;
+import com.tfamistaketracker.detector.boss.DreadnothDetector;
 import com.tfamistaketracker.detector.death.DeathDetector;
 import com.tfamistaketracker.detector.tracker.BaseRaidTracker;
 import com.tfamistaketracker.detector.tracker.VengeanceTracker;
+import com.tfamistaketracker.events.DetectorErrored;
 import com.tfamistaketracker.events.RaidRoomChanged;
 import lombok.Getter;
 import lombok.NonNull;
@@ -57,18 +60,29 @@ public class MistakeDetectorManager {
     @VisibleForTesting
     private boolean started;
 
+    // DEBUG ONLY -- shown on the debug overlay, remove before publishing
+    @Getter
+    private int errorCount;
+
+    @Getter
+    private DetectorErrored lastError;
+
     @Inject
     public MistakeDetectorManager(Client client,
                                   EventBus eventBus,
                                   RaidState raidState,
                                   VengeanceTracker vengeanceTracker,
                                   ArchiveGuardianDetector archiveGuardianDetector,
+                                  BorkDetector borkDetector,
+                                  DreadnothDetector dreadnothDetector,
                                   DeathDetector deathDetector) {
         this.raidTrackers = Arrays.asList(vengeanceTracker);
 
         // Order matters, since it's last write wins for which mistake gets put on overhead text. Death should be last.
         this.mistakeDetectors = new ArrayList<>(Arrays.asList(
                 archiveGuardianDetector,
+                borkDetector,
+                dreadnothDetector,
                 deathDetector
         ));
 
@@ -109,7 +123,11 @@ public class MistakeDetectorManager {
         List<TfaMistake> mistakes = new ArrayList<>();
         for (BaseMistakeDetector mistakeDetector : mistakeDetectors) {
             if (mistakeDetector.isDetectingMistakes() && !raider.isDead()) {
-                mistakes.addAll(mistakeDetector.detectMistakes(raider));
+                try {
+                    mistakes.addAll(mistakeDetector.detectMistakes(raider));
+                } catch (RuntimeException e) {
+                    onError(mistakeDetector, e);
+                }
             }
         }
 
@@ -119,13 +137,31 @@ public class MistakeDetectorManager {
     public void afterDetect() {
         if (!started) return;
 
-        raidTrackers.forEach(BaseRaidTracker::afterDetect);
+        for (BaseRaidTracker raidTracker : raidTrackers) {
+            try {
+                raidTracker.afterDetect();
+            } catch (RuntimeException e) {
+                onError(raidTracker, e);
+            }
+        }
 
         for (BaseMistakeDetector mistakeDetector : mistakeDetectors) {
             if (mistakeDetector.isDetectingMistakes()) {
-                mistakeDetector.afterDetect();
+                try {
+                    mistakeDetector.afterDetect();
+                } catch (RuntimeException e) {
+                    onError(mistakeDetector, e);
+                }
             }
         }
+    }
+
+    // Catch per detector so one broken detector can't stop the others, or the raiders' locations from updating
+    private void onError(Object source, RuntimeException e) {
+        log.warn("{} threw an exception", source.getClass().getSimpleName(), e);
+        errorCount++;
+        lastError = new DetectorErrored(client.getTickCount(), source.getClass().getSimpleName(), e);
+        eventBus.post(lastError);
     }
 
     @Subscribe
