@@ -106,6 +106,9 @@ public class EventLogger {
     // Last seen overhead prayer of each player, by name. Only accessed on the client thread.
     private final Map<String, HeadIcon> overheadPrayers = new HashMap<>();
 
+    // Last logged tile of each player (by name) and NPC (by index). Only accessed on the client thread.
+    private final Map<String, WorldPoint> lastTiles = new HashMap<>();
+
     private volatile LogFile logFile;
 
     private final HotkeyListener markerListener;
@@ -172,6 +175,7 @@ public class EventLogger {
         LogFile f = new LogFile(dir, dir.joinSegment(fileName));
         loggedProjectiles.clear();
         overheadPrayers.clear();
+        lastTiles.clear();
         markerCount.set(0);
         logFile = f;
         log.debug("Event logger writing to {}", f.getAbsolutePath());
@@ -184,6 +188,7 @@ public class EventLogger {
         logFile = null;
         f.close();
         overheadPrayers.clear();
+        lastTiles.clear();
         log.debug("Event logger closed {}", f.getAbsolutePath());
     }
 
@@ -235,6 +240,7 @@ public class EventLogger {
 
         if (wv != null) {
             logOverheadPrayerChanges(wv);
+            logMoves(wv);
         }
 
         LogFile f = logFile;
@@ -256,6 +262,32 @@ public class EventLogger {
                         + (firstSeen ? "UNSEEN" : prayerName(prev)) + " new=" + prayerName(icon));
             }
         }
+    }
+
+    private void logMoves(WorldView wv) {
+        if (!raidState.isInRaid()) {
+            lastTiles.clear();
+            return;
+        }
+
+        for (Player player : wv.players()) {
+            if (player != null && player.getName() != null) {
+                logMove("p:" + player.getName(), player);
+            }
+        }
+        for (NPC npc : wv.npcs()) {
+            if (npc != null) {
+                logMove("n:" + npc.getIndex(), npc);
+            }
+        }
+    }
+
+    private void logMove(String key, Actor actor) {
+        WorldPoint tile = actor.getWorldLocation();
+        if (tile == null || tile.equals(lastTiles.put(key, tile))) return;
+
+        LocalPoint lp = LocalPoint.fromWorld(client.getTopLevelWorldView(), tile);
+        write("MOVE", actor(actor) + " " + localLocation(lp, tile.getPlane()));
     }
 
     private static String prayerName(HeadIcon icon) {
