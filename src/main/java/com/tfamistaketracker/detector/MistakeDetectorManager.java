@@ -1,12 +1,18 @@
 package com.tfamistaketracker.detector;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.HashMultiset;
+import com.google.common.collect.Multiset;
+import com.tfamistaketracker.RaidRoom;
 import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.boss.ArchiveGuardianDetector;
 import com.tfamistaketracker.detector.boss.BorkDetector;
 import com.tfamistaketracker.detector.boss.DreadnothDetector;
+import com.tfamistaketracker.detector.boss.OcellusP1Detector;
+import com.tfamistaketracker.detector.boss.OcellusP2Detector;
+import com.tfamistaketracker.detector.boss.OcellusP3Detector;
 import com.tfamistaketracker.detector.boss.XarthDetector;
 import com.tfamistaketracker.detector.death.DeathDetector;
 import com.tfamistaketracker.detector.tracker.BaseRaidTracker;
@@ -18,6 +24,10 @@ import lombok.NonNull;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.NPC;
+import net.runelite.api.events.NpcChanged;
+import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.events.NpcSpawned;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 
@@ -56,6 +66,9 @@ public class MistakeDetectorManager {
     @VisibleForTesting
     private boolean started;
 
+    // How many of each NPC id that some detector requires are currently spawned
+    private final Multiset<Integer> requiredNpcCounts = HashMultiset.create();
+
     // DEBUG ONLY -- shown on the debug overlay, remove before publishing
     @Getter
     private int errorCount;
@@ -72,6 +85,9 @@ public class MistakeDetectorManager {
                                   BorkDetector borkDetector,
                                   DreadnothDetector dreadnothDetector,
                                   XarthDetector xarthDetector,
+                                  OcellusP1Detector ocellusP1Detector,
+                                  OcellusP2Detector ocellusP2Detector,
+                                  OcellusP3Detector ocellusP3Detector,
                                   DeathDetector deathDetector) {
         this.raidTrackers = Arrays.asList(vengeanceTracker);
 
@@ -81,6 +97,9 @@ public class MistakeDetectorManager {
                 borkDetector,
                 dreadnothDetector,
                 xarthDetector,
+                ocellusP1Detector,
+                ocellusP2Detector,
+                ocellusP3Detector,
                 deathDetector
         ));
 
@@ -98,11 +117,13 @@ public class MistakeDetectorManager {
         // Startup all raid trackers
         raidTrackers.forEach(BaseRaidTracker::startup);
 
-        // Startup any detectors that should be active in *all* rooms, or in the current room. The first room is entered
-        // before the manager starts listening for room changes.
-        mistakeDetectors.stream()
-                .filter(d -> d.getRaidRoom() == null || d.getRaidRoom() == raidstate.getCurrentRoom())
-                .forEach(BaseMistakeDetector::startup);
+        requiredNpcCounts.clear();
+        for (NPC npc : client.getTopLevelWorldView().npcs()) {
+            addNpc(npc.getId());
+        }
+
+        // The first room is entered before the manager starts listening for room changes
+        refreshDetectors(raidstate.getCurrentRoom());
     }
 
     public void shutdown() {
@@ -110,6 +131,7 @@ public class MistakeDetectorManager {
         // Don't clear mistakeDetectors or else we can't get them back.
 
         raidTrackers.forEach(BaseRaidTracker::shutdown);
+        requiredNpcCounts.clear();
 
         eventBus.unregister(this);
         started = false;
@@ -120,7 +142,7 @@ public class MistakeDetectorManager {
 
         List<TfaMistake> mistakes = new ArrayList<>();
         for (BaseMistakeDetector mistakeDetector : mistakeDetectors) {
-            if (mistakeDetector.isDetectingMistakes() && !raider.isDead()) {
+            if (mistakeDetector.isStarted() && mistakeDetector.isDetectingMistakes() && !raider.isDead()) {
                 try {
                     mistakes.addAll(mistakeDetector.detectMistakes(raider));
                 } catch (RuntimeException e) {
@@ -144,7 +166,7 @@ public class MistakeDetectorManager {
         }
 
         for (BaseMistakeDetector mistakeDetector : mistakeDetectors) {
-            if (mistakeDetector.isDetectingMistakes()) {
+            if (mistakeDetector.isStarted() && mistakeDetector.isDetectingMistakes()) {
                 try {
                     mistakeDetector.afterDetect();
                 } catch (RuntimeException e) {
@@ -164,14 +186,61 @@ public class MistakeDetectorManager {
 
     @Subscribe
     public void onRaidRoomChanged(RaidRoomChanged event) {
-        // Detectors that run in *all* rooms do not need to handle these events
-        mistakeDetectors.stream().filter(d -> d.getRaidRoom() != null).forEach(detector -> {
-            if (detector.getRaidRoom() == event.getNewRaidRoom()) {
+        refreshDetectors(event.getNewRaidRoom());
+    }
+
+    @Subscribe
+    public void onNpcSpawned(NpcSpawned event) {
+        if (addNpc(event.getNpc().getId())) {
+            refreshDetectors(raidstate.getCurrentRoom());
+        }
+    }
+
+    @Subscribe
+    public void onNpcChanged(NpcChanged event) {
+        boolean removed = event.getOld() != null && removeNpc(event.getOld().getId());
+        if (addNpc(event.getNpc().getId()) || removed) {
+            refreshDetectors(raidstate.getCurrentRoom());
+        }
+    }
+
+    @Subscribe
+    public void onNpcDespawned(NpcDespawned event) {
+        if (removeNpc(event.getNpc().getId())) {
+            refreshDetectors(raidstate.getCurrentRoom());
+        }
+    }
+
+    private boolean addNpc(int npcId) {
+        if (!isRequiredNpc(npcId)) return false;
+        requiredNpcCounts.add(npcId);
+        return true;
+    }
+
+    private boolean removeNpc(int npcId) {
+        if (!isRequiredNpc(npcId)) return false;
+        requiredNpcCounts.remove(npcId);
+        return true;
+    }
+
+    private boolean isRequiredNpc(int npcId) {
+        return mistakeDetectors.stream().anyMatch(d -> d.getRequiredNpcId() != null && d.getRequiredNpcId() == npcId);
+    }
+
+    private void refreshDetectors(RaidRoom room) {
+        for (BaseMistakeDetector detector : mistakeDetectors) {
+            if (shouldBeStarted(detector, room)) {
                 detector.startup();
-            } else if (detector.getRaidRoom() == event.getPrevRaidRoom()) {
+            } else if (detector.isStarted()) {
                 detector.shutdown();
             }
-        });
+        }
+    }
+
+    private boolean shouldBeStarted(BaseMistakeDetector detector, RaidRoom room) {
+        // A null room means *all* rooms
+        if (detector.getRaidRoom() != null && detector.getRaidRoom() != room) return false;
+        return detector.getRequiredNpcId() == null || requiredNpcCounts.contains(detector.getRequiredNpcId());
     }
 
     // DEBUG ONLY -- uses reflection for hotswap. Remove before publishing.
@@ -191,8 +260,7 @@ public class MistakeDetectorManager {
             newInstance.setEventBus(eventBus);
             newInstance.setRaidState(raidstate);
             newInstance.setVengeanceTracker(vengeanceTracker);
-            if (started &&
-                    (newInstance.getRaidRoom() == null || newInstance.getRaidRoom() == raidstate.getCurrentRoom())) {
+            if (started && shouldBeStarted(newInstance, raidstate.getCurrentRoom())) {
                 newInstance.startup();
             }
             mistakeDetectors.set(i, newInstance);

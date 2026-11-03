@@ -272,7 +272,7 @@ public class EventLogger {
             boolean firstSeen = !overheadPrayers.containsKey(name);
             HeadIcon prev = overheadPrayers.put(name, icon);
             if (firstSeen || prev != icon) {
-                write("OVERHEAD_PRAYER", "player name=" + clean(Text.removeTags(name)) + " old="
+                write("OVERHEAD_PRAYER", "player name=" + cleanTags(name) + " old="
                         + (firstSeen ? "UNSEEN" : prayerName(prev)) + " new=" + prayerName(icon));
             }
         }
@@ -460,7 +460,7 @@ public class EventLogger {
     @Subscribe
     public void onChatMessage(ChatMessage e) {
         write("CHAT", "type=" + e.getType() + " name=" + clean(e.getName()) + " message="
-                + clean(Text.removeTags(e.getMessage())));
+                + cleanTags(e.getMessage()));
     }
 
     @Subscribe
@@ -516,7 +516,7 @@ public class EventLogger {
     }
 
     private String npc(NPC npc) {
-        return "id=" + npc.getId() + " name=" + clean(Text.removeTags(npc.getName())) + " index=" + npc.getIndex()
+        return "id=" + npc.getId() + " name=" + cleanTags(npc.getName()) + " index=" + npc.getIndex()
                 + " size=" + (npc.getComposition() == null ? "?" : npc.getComposition().getSize());
     }
 
@@ -525,11 +525,11 @@ public class EventLogger {
             return "null";
         } else if (actor instanceof NPC) {
             NPC npc = (NPC) actor;
-            return "npc id=" + npc.getId() + " name=" + clean(Text.removeTags(npc.getName())) + " index=" + npc.getIndex();
+            return "npc id=" + npc.getId() + " name=" + cleanTags(npc.getName()) + " index=" + npc.getIndex();
         } else if (actor instanceof Player) {
-            return "player name=" + clean(Text.removeTags(actor.getName()));
+            return "player name=" + cleanTags(actor.getName());
         }
-        return "actor name=" + clean(Text.removeTags(actor.getName()));
+        return "actor name=" + cleanTags(actor.getName());
     }
 
     private String actorLocation(Actor actor) {
@@ -591,6 +591,11 @@ public class EventLogger {
     private static String worldPoint(WorldPoint wp) {
         return "region=" + wp.getRegionID() + " plane=" + wp.getPlane() + " x=" + wp.getX() + " y=" + wp.getY()
                 + " rx=" + wp.getRegionX() + " ry=" + wp.getRegionY();
+    }
+
+    private static String cleanTags(String s) {
+        if (s == null) return "null";
+        return clean(Text.removeTags(s));
     }
 
     private static String clean(String s) {

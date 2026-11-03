@@ -82,6 +82,16 @@ public abstract class BaseMistakeDetector {
     public abstract RaidRoom getRaidRoom();
 
     /**
+     * Retrieve the id of the NPC that must be spawned for this detector to startup, on top of being in its raid room.
+     * A null value means no NPC is required.
+     *
+     * @return The id of the NPC that the detector requires, or null for none
+     */
+    public Integer getRequiredNpcId() {
+        return null;
+    }
+
+    /**
      * Detects mistakes for the given raider.
      * This is called during handling the {@link net.runelite.api.events.GameTick} event, each tick.
      *
