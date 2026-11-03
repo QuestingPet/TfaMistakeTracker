@@ -13,17 +13,19 @@ import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.GraphicsObject;
+import net.runelite.api.GroundObject;
 import net.runelite.api.HeadIcon;
 import net.runelite.api.HitsplatID;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
+import net.runelite.api.Tile;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.AnimationChanged;
-import net.runelite.api.events.GameObjectDespawned;
-import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.GraphicsObjectCreated;
+import net.runelite.api.events.GroundObjectDespawned;
+import net.runelite.api.events.GroundObjectSpawned;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.gameval.AnimationID;
 import net.runelite.api.gameval.NpcID;
@@ -54,8 +56,8 @@ import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_GRIEF;
 /**
  * In phase 3, Ocellus slashes, drops void bombs that leave void floor behind, and explodes the arena after untethering:
  * first everything outside him, then under him a tick later. During his parry and his hybrid attack, raiders have to
- * pray correctly when the hits land, and rifts that aren't dealt with in time explode on everyone. After his siphon,
- * void explosions chase each raider until his prayer attack. Only your own are visible, so they're recognised by damage.
+ * pray correctly when the hits land, and rifts that aren't dealt with in time explode on everyone. After each of his two
+ * siphons, void explosions chase each raider until his next prayer attack. Only your own are visible, so they're recognised by damage.
  */
 @Slf4j
 @Singleton
@@ -80,8 +82,9 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     private static final int PRAYER_ATTACK_HIT_DELAY_IN_TICKS = 5;
     private static final int PURPLE_TILE_HIT_DELAY_IN_TICKS = 4;
     private static final int VOID_FLOOR_HIT_DELAY_IN_TICKS = 2;
-    // Skips the siphon hit, which lands 4 ticks after it starts
-    private static final int VOID_EXPLOSION_START_DELAY_IN_TICKS = 5;
+    // Both skip the siphon hit
+    private static final int FIRST_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS = 5;
+    private static final int SECOND_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS = 2;
     private static final int MIN_VOID_EXPLOSION_HIT = 13;
     private static final int MAX_VOID_EXPLOSION_HIT = 17;
 
@@ -120,6 +123,21 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     }
 
     @Override
+    public void startup() {
+        super.startup();
+        // Void floor can already be down when the phase starts
+        Tile[][] tiles = client.getTopLevelWorldView().getScene().getTiles()[client.getTopLevelWorldView().getPlane()];
+        for (Tile[] column : tiles) {
+            for (Tile tile : column) {
+                GroundObject groundObject = tile == null ? null : tile.getGroundObject();
+                if (groundObject != null && groundObject.getId() == ObjectID.TFA_OCELLUS_VOID_DEGEN_BOMB) {
+                    voidFloorTiles.put(groundObject.getWorldLocation(), client.getTickCount());
+                }
+            }
+        }
+    }
+
+    @Override
     public void cleanup() {
         aoeHitTiles.clear();
         insolenceHitTiles.clear();
@@ -133,7 +151,6 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         untetherTick = -1;
         untetherArea = null;
         voidExplosionStartTick = -1;
-        voidExplosionRaiders.clear();
         voidExplosionRaiders.clear();
         riftExplosionCount = 0;
         fallingRaiders.clear();
@@ -205,6 +222,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         int tick = client.getTickCount();
         parryHitTicks.remove(tick);
         prayerAttackHits.remove(tick);
+        voidExplosionRaiders.clear();
         riftExplosionCount = 0;
         fallingRaiders.clear();
     }
@@ -303,7 +321,9 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_PRAYER_OUT) {
             parryHitTicks.removeIf(hitTick -> hitTick > tick);
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_DEFLECT_IN) {
-            voidExplosionStartTick = tick + VOID_EXPLOSION_START_DELAY_IN_TICKS;
+            voidExplosionStartTick = tick + FIRST_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS;
+        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_SOUL_FRAGMENT_START) {
+            voidExplosionStartTick = tick + SECOND_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS;
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_MELEE_HYBRID) {
             prayerAttacker = npc;
             voidExplosionStartTick = -1;
@@ -341,16 +361,16 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     }
 
     @Subscribe
-    public void onGameObjectSpawned(GameObjectSpawned event) {
-        if (event.getGameObject().getId() == ObjectID.TFA_OCELLUS_VOID_DEGEN_BOMB) {
-            voidFloorTiles.put(event.getGameObject().getWorldLocation(), client.getTickCount());
+    public void onGroundObjectSpawned(GroundObjectSpawned event) {
+        if (event.getGroundObject().getId() == ObjectID.TFA_OCELLUS_VOID_DEGEN_BOMB) {
+            voidFloorTiles.put(event.getGroundObject().getWorldLocation(), client.getTickCount());
         }
     }
 
     @Subscribe
-    public void onGameObjectDespawned(GameObjectDespawned event) {
-        if (event.getGameObject().getId() == ObjectID.TFA_OCELLUS_VOID_DEGEN_BOMB) {
-            voidFloorTiles.remove(event.getGameObject().getWorldLocation());
+    public void onGroundObjectDespawned(GroundObjectDespawned event) {
+        if (event.getGroundObject().getId() == ObjectID.TFA_OCELLUS_VOID_DEGEN_BOMB) {
+            voidFloorTiles.remove(event.getGroundObject().getWorldLocation());
         }
     }
 }
