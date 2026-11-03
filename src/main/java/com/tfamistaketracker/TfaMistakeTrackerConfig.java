@@ -262,11 +262,74 @@ public interface TfaMistakeTrackerConfig extends Config {
         return TfaMistake.DREADNOTH_INSIDE.getDefaultMessage();
     }
 
+    @ConfigSection(
+            name = "Xarth Mistake Messages",
+            description = "Settings for the messages shown on Xarth mistakes (separate multiple messages by \"|\").",
+            position = 7,
+            closedByDefault = true
+    )
+    String xarthMistakeSettings = "xarthMistakeSettings";
+
+    @ConfigItem(
+            keyName = "xarthTetherMessage",
+            name = "Xarth Tether",
+            description = "Message to show when hit by Xarth's tether fireball.",
+            section = xarthMistakeSettings,
+            position = 0
+    )
+    default String xarthTetherMessage() {
+        return TfaMistake.XARTH_TETHER.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "xarthExplosionMessage",
+            name = "Xarth Explosion",
+            description = "Message to show when caught in Xarth's flame blast explosion.",
+            section = xarthMistakeSettings,
+            position = 1
+    )
+    default String xarthExplosionMessage() {
+        return TfaMistake.XARTH_EXPLOSION.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "xarthFireMessage",
+            name = "Xarth Fire",
+            description = "Message to show when standing in fire in the Xarth room.",
+            section = xarthMistakeSettings,
+            position = 2
+    )
+    default String xarthFireMessage() {
+        return TfaMistake.XARTH_FIRE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "xarthMeleeMessage",
+            name = "Xarth Melee",
+            description = "Message to show when hit by Xarth's melee attack without praying melee.",
+            section = xarthMistakeSettings,
+            position = 3
+    )
+    default String xarthMeleeMessage() {
+        return TfaMistake.XARTH_MELEE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "xarthCorpseHealMessage",
+            name = "Xarth Corpse Heal",
+            description = "Message to show when a corpse reaches Xarth and heals him. Every raider gets this mistake.",
+            section = xarthMistakeSettings,
+            position = 4
+    )
+    default String xarthCorpseHealMessage() {
+        return TfaMistake.XARTH_CORPSE_HEAL.getDefaultMessage();
+    }
+
     // DEBUG ONLY -- everything in this section is for development and must be removed before publishing
     @ConfigSection(
             name = "Debug",
             description = "Developer tools. Only work in developer mode.",
-            position = 7,
+            position = 8,
             closedByDefault = true
     )
     String debugSettings = "debugSettings";

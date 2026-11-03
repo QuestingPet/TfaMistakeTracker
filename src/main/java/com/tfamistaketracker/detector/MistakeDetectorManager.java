@@ -7,6 +7,7 @@ import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.boss.ArchiveGuardianDetector;
 import com.tfamistaketracker.detector.boss.BorkDetector;
 import com.tfamistaketracker.detector.boss.DreadnothDetector;
+import com.tfamistaketracker.detector.boss.XarthDetector;
 import com.tfamistaketracker.detector.death.DeathDetector;
 import com.tfamistaketracker.detector.tracker.BaseRaidTracker;
 import com.tfamistaketracker.detector.tracker.VengeanceTracker;
@@ -16,12 +17,9 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
-import net.runelite.api.events.ChatMessage;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.util.Text;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -42,8 +40,6 @@ import java.util.List;
 @Slf4j
 @Singleton
 public class MistakeDetectorManager {
-
-    private static final String WIPE_GAME_MESSAGE = "You failed to survive the Fractured Archive";
 
     private final Client client;
     private final EventBus eventBus;
@@ -75,6 +71,7 @@ public class MistakeDetectorManager {
                                   ArchiveGuardianDetector archiveGuardianDetector,
                                   BorkDetector borkDetector,
                                   DreadnothDetector dreadnothDetector,
+                                  XarthDetector xarthDetector,
                                   DeathDetector deathDetector) {
         this.raidTrackers = Arrays.asList(vengeanceTracker);
 
@@ -83,6 +80,7 @@ public class MistakeDetectorManager {
                 archiveGuardianDetector,
                 borkDetector,
                 dreadnothDetector,
+                xarthDetector,
                 deathDetector
         ));
 
@@ -174,23 +172,6 @@ public class MistakeDetectorManager {
                 detector.shutdown();
             }
         });
-    }
-
-    @Subscribe
-    public void onChatMessage(ChatMessage event) {
-        if (event.getType() != ChatMessageType.GAMEMESSAGE) return;
-
-        String message = Text.removeTags(event.getMessage());
-        if (message != null && message.startsWith(WIPE_GAME_MESSAGE)) {
-            // If the team has wiped, all active detectors should reset state just in case.
-            log.debug("Team wiped -- Resetting all active detectors");
-            mistakeDetectors.stream()
-                    .filter(BaseMistakeDetector::isDetectingMistakes)
-                    .forEach(d -> {
-                        d.shutdown();
-                        d.startup();
-                    });
-        }
     }
 
     // DEBUG ONLY -- uses reflection for hotswap. Remove before publishing.

@@ -126,7 +126,7 @@ public class DebugOverlayPanel extends OverlayPanel {
                     .right("#" + eventLogger.getLastMarker())
                     .build());
             panelComponent.getChildren().add(LineComponent.builder()
-                    .left(eventLogger.getLogFilePath())
+                    .left(eventLogger.getLogFileName())
                     .build());
         }
 

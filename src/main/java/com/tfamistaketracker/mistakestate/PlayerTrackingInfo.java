@@ -35,10 +35,6 @@ public class PlayerTrackingInfo {
         raidCount++;
     }
 
-    public boolean hasMistakes() {
-        return !mistakes.isEmpty();
-    }
-
     private static <T> Integer increment(T key, Integer oldValue) {
         return oldValue == null ? 1 : oldValue + 1;
     }

@@ -91,6 +91,10 @@ public class BorkDetector extends BaseMistakeDetector {
     public List<TfaMistake> detectMistakes(@NonNull Raider raider) {
         List<TfaMistake> mistakes = new ArrayList<>();
 
+        if (fireTiles.contains(raider.getPreviousWorldLocation())) {
+            mistakes.add(BORK_FIRE);
+        }
+
         if (stompHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(BORK_STOMP);
         }
@@ -101,10 +105,6 @@ public class BorkDetector extends BaseMistakeDetector {
 
         if (isSmorksHit(raider)) {
             mistakes.add(BORK_SMORKS_AA);
-        }
-
-        if (fireTiles.contains(raider.getPreviousWorldLocation())) {
-            mistakes.add(BORK_FIRE);
         }
 
         return mistakes;

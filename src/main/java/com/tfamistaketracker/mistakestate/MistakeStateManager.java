@@ -56,8 +56,9 @@ public class MistakeStateManager {
     }
 
     public void newRaid(Set<String> playerNames) {
-        // Clear just the current mistakes
+        // Clear just the current mistakes, and start every raider in the current raid with none
         currentRaidMistakeManager.clearAllMistakes();
+        currentRaidMistakeManager.newRaid(playerNames);
 
         // Denote to the manager that there's a new raid, incrementing the raid count for all players in this raid
         // Raid count for current raid isn't valid, so only do for all raids
@@ -66,10 +67,10 @@ public class MistakeStateManager {
         mistakeStateWriter.write(this);
     }
 
-    public Set<String> getPlayersWithMistakes() {
+    public Set<String> getPlayers() {
         return isAll ?
-                allRaidsMistakeManager.getPlayersWithMistakes() :
-                currentRaidMistakeManager.getPlayersWithMistakes();
+                allRaidsMistakeManager.getPlayers() :
+                currentRaidMistakeManager.getPlayers();
     }
 
     public int getMistakeCountForPlayer(String playerName, TfaMistake mistake) {

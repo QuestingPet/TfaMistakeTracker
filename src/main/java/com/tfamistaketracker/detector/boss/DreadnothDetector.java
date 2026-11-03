@@ -71,7 +71,7 @@ public class DreadnothDetector extends BaseMistakeDetector {
     private NPC dreadnoth;
     private WorldArea previousDreadnothArea;
     private int landingTick;
-    // His body stays in place after he dies, but standing in it is no longer a mistake
+    // Once he dies only the blood pools and jellies can still hurt anyone
     private boolean isDreadnothDead;
 
     private final Set<Integer> slamTicks = new HashSet<>();
@@ -128,21 +128,6 @@ public class DreadnothDetector extends BaseMistakeDetector {
         List<TfaMistake> mistakes = new ArrayList<>();
         WorldPoint previousLocation = raider.getPreviousWorldLocation();
 
-        boolean isLandedOn = landingHitTiles.getActiveHitTiles().contains(previousLocation);
-        if (isLandedOn) {
-            mistakes.add(DREADNOTH_LANDED);
-        } else if (isSlamHit(raider)) {
-            mistakes.add(DREADNOTH_SLAM);
-        }
-
-        if (isRangeHit(raider)) {
-            mistakes.add(DREADNOTH_RANGE);
-        }
-
-        if (bloodBallHitTiles.getActiveHitTiles().contains(previousLocation)) {
-            mistakes.add(DREADNOTH_BLOOD_BALL);
-        }
-
         if (isBloodPoolHit(raider)) {
             mistakes.add(DREADNOTH_BLOOD_POOL);
         }
@@ -151,8 +136,26 @@ public class DreadnothDetector extends BaseMistakeDetector {
             mistakes.add(DREADNOTH_JELLY);
         }
 
+        if (isDreadnothDead) {
+            return mistakes;
+        }
+
+        if (isRangeHit(raider)) {
+            mistakes.add(DREADNOTH_RANGE);
+        }
+
         if (isInside(previousLocation)) {
             mistakes.add(DREADNOTH_INSIDE);
+        }
+
+        if (bloodBallHitTiles.getActiveHitTiles().contains(previousLocation)) {
+            mistakes.add(DREADNOTH_BLOOD_BALL);
+        }
+
+        if (landingHitTiles.getActiveHitTiles().contains(previousLocation)) {
+            mistakes.add(DREADNOTH_LANDED);
+        } else if (isSlamHit(raider)) {
+            mistakes.add(DREADNOTH_SLAM);
         }
 
         return mistakes;
@@ -245,12 +248,21 @@ public class DreadnothDetector extends BaseMistakeDetector {
             } else if (npc.getAnimation() == AnimationID.DREADNOTH_JUMP02) {
                 onJump(JUMP_DURATION_IN_TICKS);
             } else if (npc.getAnimation() == AnimationID.DREADNOTH_DEATH01) {
-                isDreadnothDead = true;
+                onDreadnothDeath();
             }
         } else if (npc.getId() == NpcID.TFA_JELLY_MINION && npc.getAnimation() == AnimationID.JELLY_ATTACK &&
                 npc.getInteracting() instanceof Player) {
             jellyTargets.add(npc.getInteracting().getName());
         }
+    }
+
+    private void onDreadnothDeath() {
+        isDreadnothDead = true;
+        slamTicks.clear();
+        rangeOverheadTracker.clear();
+        landingHitTiles.clear();
+        bloodBallHitTiles.clear();
+        trackedBloodBalls.clear();
     }
 
     private void onJump(int durationInTicks) {

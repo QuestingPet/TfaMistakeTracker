@@ -50,9 +50,8 @@ class MistakeManager {
         trackingInfo.remove(playerName);
     }
 
-    public Set<String> getPlayersWithMistakes() {
+    public Set<String> getPlayers() {
         return trackingInfo.values().stream()
-                .filter(PlayerTrackingInfo::hasMistakes)
                 .map(PlayerTrackingInfo::getPlayerName)
                 .collect(Collectors.toSet());
     }

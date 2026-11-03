@@ -159,11 +159,11 @@ public class EventLogger {
     }
 
     /**
-     * @return The absolute path of the current log file, or null if not logging
+     * @return The file name of the current log file, or null if not logging
      */
-    public String getLogFilePath() {
+    public String getLogFileName() {
         LogFile f = logFile;
-        return f == null ? null : f.getAbsolutePath();
+        return f == null ? null : Paths.get(f.getAbsolutePath()).getFileName().toString();
     }
 
     private boolean shouldLog() {

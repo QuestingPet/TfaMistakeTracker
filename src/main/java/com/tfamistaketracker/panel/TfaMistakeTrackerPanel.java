@@ -227,8 +227,8 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
             updateOverallPanel();
             reorderRaiderBoxes();
         } else {
-            // We're looking at the current raid view, reset it and start over
-            resetUi();
+            // We're looking at the current raid view, start over with every raider at no mistakes
+            rebuildAll();
         }
     }
 
@@ -280,7 +280,7 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
         }
         playerMistakesBoxes.clear();
 
-        for (String playerName : mistakeStateManager.getPlayersWithMistakes()) {
+        for (String playerName : mistakeStateManager.getPlayers()) {
             buildBox(playerName);
         }
 
@@ -375,7 +375,7 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
 
     private void updateOverallPanel() {
         overallPlayersLabel.setText(htmlLabel("Total players: ",
-                mistakeStateManager.getPlayersWithMistakes().size()));
+                mistakeStateManager.getPlayers().size()));
         overallMistakesLabel.setText(htmlLabel("Total mistakes: ",
                 mistakeStateManager.getTotalMistakeCountForAllPlayers()));
         overallRaidsLabel.setText(htmlLabel("Tracked raids: ",

@@ -70,9 +70,7 @@ public abstract class BaseMistakeDetector {
     }
 
     /**
-     * Cleanup all relevant state in the detector. This is called during startup to reset state, and shutdown to cleanup
-     * This is also called for active detectors whenever raiders are loaded, which is during room transitions and room
-     * resets (wipes).
+     * Cleanup all relevant state in the detector. This is called during startup to reset state, and shutdown to cleanup.
      */
     public abstract void cleanup();
 

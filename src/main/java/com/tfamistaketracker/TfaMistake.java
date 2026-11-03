@@ -40,6 +40,13 @@ public enum TfaMistake {
     DREADNOTH_LANDED("Dreadnoth Landed", TfaMistakeTrackerConfig::dreadnothLandedMessage, "Bonk!", ""),
     DREADNOTH_JELLY("Dreadnoth Jelly", TfaMistakeTrackerConfig::dreadnothJellyMessage, "I'm smited!", ""),
     DREADNOTH_INSIDE("Dreadnoth Inside", TfaMistakeTrackerConfig::dreadnothInsideMessage, "What's inside?", ""),
+
+    // Xarth
+    XARTH_TETHER("Xarth Tether", TfaMistakeTrackerConfig::xarthTetherMessage, "I was checkmated!", ""),
+    XARTH_EXPLOSION("Xarth Explosion", TfaMistakeTrackerConfig::xarthExplosionMessage, "I'm exploding!", ""),
+    XARTH_FIRE("Xarth Fire", TfaMistakeTrackerConfig::xarthFireMessage, "I'm burning!", ""),
+    XARTH_MELEE("Xarth Melee", TfaMistakeTrackerConfig::xarthMeleeMessage, "The Hash-Slinging Slasher!", ""),
+    XARTH_CORPSE_HEAL("Xarth Corpse Heal", TfaMistakeTrackerConfig::xarthCorpseHealMessage, "We're healing him!", ""),
     ;
 
     private static final String FALLBACK_IMAGE_PATH = "death.png";
