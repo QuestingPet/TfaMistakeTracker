@@ -28,13 +28,14 @@ import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Singleton;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static com.tfamistaketracker.RaidRoom.BORK;
 import static com.tfamistaketracker.TfaMistake.BORK_FIRE;
+import static com.tfamistaketracker.TfaMistake.BORK_FIREBALL;
 import static com.tfamistaketracker.TfaMistake.BORK_MELEE;
 import static com.tfamistaketracker.TfaMistake.BORK_SMORKS_AA;
 import static com.tfamistaketracker.TfaMistake.BORK_STOMP;
@@ -55,29 +56,45 @@ public class BorkDetector extends BaseMistakeDetector {
             AnimationID.NPC_BORK_ENRAGED_STOMP_ATTACK01,
             AnimationID.NPC_BORK_ENRAGED_STOMP_ATTACK_CYCLE_AND_OUT01);
 
+    private static final Set<Integer> FIREBALL_SPLASH_IDS = ImmutableSet.of(
+            SpotanimID.VFX_SMORK_NAPALM_FIRE_SPOTANIM01,
+            SpotanimID.VFX_SMORK_NAPALM_SPLAT_SPOTANIM01,
+            SpotanimID.VFX_SMORK_NAPALM_SPLAT_SPOTANIM01_90,
+            SpotanimID.VFX_SMORK_NAPALM_SPLAT_SPOTANIM01_180,
+            SpotanimID.VFX_SMORK_NAPALM_SPLAT_SPOTANIM01_270);
+
     private static final Map<Integer, OverheadTracker.Attack> SMORKS_ATTACKS = ImmutableMap.of(
             SpotanimID.VFX_SMORK_RANGE_ATTACK_PROJANIM01,
             OverheadTracker.Attack.of(HeadIcon.RANGED, OverheadTracker.PrayerCheck.HIT),
             SpotanimID.VFX_SMORK_MAGE_ATTACK_PROJANIM01,
             OverheadTracker.Attack.of(HeadIcon.MAGIC, OverheadTracker.PrayerCheck.HIT));
 
-    // Bork spawns before the room is detected, so stomps are tracked from his animations instead of the NPC
+    // Bork spawns before the room is detected, so he's picked up from his animations instead of his spawn
+    private NPC bork;
     private boolean isStomping;
+    private int lastFootprintTick;
 
     private final InstantHitTilesTracker stompHitTiles = new InstantHitTilesTracker();
     private final InstantHitTilesTracker meleeHitTiles = new InstantHitTilesTracker();
+    private final InstantHitTilesTracker fireballHitTiles = new InstantHitTilesTracker();
     private final OverheadTracker smorksOverheadTracker = new OverheadTracker(SMORKS_ATTACKS);
-    private final Set<WorldPoint> fireTiles = new HashSet<>();
+    // Fire tile -> tick it spawned. Fire doesn't burn on the tick it spawns.
+    private final Map<WorldPoint, Integer> fireTiles = new HashMap<>();
 
     public BorkDetector() {
+        bork = null;
         isStomping = false;
+        lastFootprintTick = -1;
     }
 
     @Override
     public void cleanup() {
+        bork = null;
         isStomping = false;
+        lastFootprintTick = -1;
         stompHitTiles.clear();
         meleeHitTiles.clear();
+        fireballHitTiles.clear();
         smorksOverheadTracker.clear();
         fireTiles.clear();
     }
@@ -91,8 +108,12 @@ public class BorkDetector extends BaseMistakeDetector {
     public List<TfaMistake> detectMistakes(@NonNull Raider raider) {
         List<TfaMistake> mistakes = new ArrayList<>();
 
-        if (fireTiles.contains(raider.getPreviousWorldLocation())) {
+        if (isOnFire(raider.getPreviousWorldLocation())) {
             mistakes.add(BORK_FIRE);
+        }
+
+        if (fireballHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
+            mistakes.add(BORK_FIREBALL);
         }
 
         if (stompHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
@@ -119,8 +140,14 @@ public class BorkDetector extends BaseMistakeDetector {
     public void renderDebugTiles(DebugTilesOverlay overlay) {
         overlay.renderHitTiles(stompHitTiles);
         overlay.renderHitTiles(meleeHitTiles);
+        overlay.renderHitTiles(fireballHitTiles);
         overlay.renderProjectiles(smorksOverheadTracker);
-        overlay.renderLastingTiles(fireTiles);
+        overlay.renderLastingTiles(fireTiles.keySet());
+    }
+
+    private boolean isOnFire(WorldPoint location) {
+        Integer spawnTick = fireTiles.get(location);
+        return spawnTick != null && spawnTick != client.getTickCount();
     }
 
     private boolean isMeleeHit(Raider raider) {
@@ -147,18 +174,25 @@ public class BorkDetector extends BaseMistakeDetector {
     public void onGameTick(GameTick event) {
         stompHitTiles.onGameTick(client.getTickCount());
         meleeHitTiles.onGameTick(client.getTickCount());
+        fireballHitTiles.onGameTick(client.getTickCount());
         smorksOverheadTracker.onGameTick(client.getTickCount());
     }
 
     @Subscribe
     public void onGraphicsObjectCreated(GraphicsObjectCreated event) {
+        if (FIREBALL_SPLASH_IDS.contains(event.getGraphicsObject().getId())) {
+            fireballHitTiles.add(getWorldPoint(event.getGraphicsObject()));
+            return;
+        }
         if (event.getGraphicsObject().getId() != SpotanimID.TFA_WAVE_DUST_SHORT) return;
 
-        WorldPoint tile = getWorldPoint(event.getGraphicsObject());
-        if (isStomping) {
-            stompHitTiles.add(tile);
-        } else {
-            meleeHitTiles.add(tile);
+        InstantHitTilesTracker hitTiles = isStomping ? stompHitTiles : meleeHitTiles;
+        hitTiles.add(getWorldPoint(event.getGraphicsObject()));
+
+        // Under him isn't safe either, even though the dust doesn't show there
+        if (bork != null && lastFootprintTick != client.getTickCount()) {
+            lastFootprintTick = client.getTickCount();
+            bork.getWorldArea().toWorldPointList().forEach(hitTiles::add);
         }
     }
 
@@ -172,7 +206,7 @@ public class BorkDetector extends BaseMistakeDetector {
     @Subscribe
     public void onGameObjectSpawned(GameObjectSpawned event) {
         if (event.getGameObject().getId() == ObjectID.TFA_BORK_RAGGED_TILE) {
-            fireTiles.add(event.getGameObject().getWorldLocation());
+            fireTiles.put(event.getGameObject().getWorldLocation(), client.getTickCount());
         }
     }
 
@@ -187,6 +221,7 @@ public class BorkDetector extends BaseMistakeDetector {
     public void onAnimationChanged(AnimationChanged event) {
         if (!(event.getActor() instanceof NPC) || ((NPC) event.getActor()).getId() != NpcID.TFA_BORK) return;
 
-        isStomping = STOMP_ANIMATION_IDS.contains(event.getActor().getAnimation());
+        bork = (NPC) event.getActor();
+        isStomping = STOMP_ANIMATION_IDS.contains(bork.getAnimation());
     }
 }

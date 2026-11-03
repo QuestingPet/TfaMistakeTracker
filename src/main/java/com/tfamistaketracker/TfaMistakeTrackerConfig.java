@@ -177,6 +177,17 @@ public interface TfaMistakeTrackerConfig extends Config {
         return TfaMistake.BORK_FIRE.getDefaultMessage();
     }
 
+    @ConfigItem(
+            keyName = "borkFireballMessage",
+            name = "Bork Fireball",
+            description = "Message to show when hit by The Smorks' fireball landing.",
+            section = borkMistakeSettings,
+            position = 4
+    )
+    default String borkFireballMessage() {
+        return TfaMistake.BORK_FIREBALL.getDefaultMessage();
+    }
+
     @ConfigSection(
             name = "Dreadnoth Mistake Messages",
             description = "Settings for the messages shown on Dreadnoth mistakes (separate multiple messages by \"|\").",
