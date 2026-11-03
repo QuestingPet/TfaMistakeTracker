@@ -21,6 +21,7 @@ import net.runelite.api.Player;
 import net.runelite.api.Tile;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.GraphicsObjectCreated;
@@ -56,8 +57,9 @@ import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_GRIEF;
 /**
  * In phase 3, Ocellus slashes, drops void bombs that leave void floor behind, and explodes the arena after untethering:
  * first everything outside him, then under him a tick later. During his parry and his hybrid attack, raiders have to
- * pray correctly when the hits land, and rifts that aren't dealt with in time explode on everyone. After each of his two
- * siphons, void explosions chase each raider until his next prayer attack. Only your own are visible, so they're recognised by damage.
+ * pray correctly when the hits land, and rifts that aren't dealt with in time explode on everyone. After his range and
+ * melee attacks, void explosions chase each raider until his next prayer attack. Only your own are visible, so they're
+ * recognised by damage. Nothing counts once he starts dying.
  */
 @Slf4j
 @Singleton
@@ -77,14 +79,16 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             AnimationID.VFX_OCELLUS_VOIDFLARE_HEAL_DETONATE,
             AnimationID.VFX_OCELLUS_VOIDFLARE_BUFF_DETONATE);
 
-    // The parry hits 1 tick after it starts, then every 3 ticks from 5 ticks after, until it ends
+    // The parry hits 1 tick after it starts, then every 3 ticks from 5 ticks after, until it ends. Every raider gets a
+    // hitsplat on each hit, so it only counts if they took damage.
     private static final int[] PARRY_HIT_OFFSETS = {1, 5, 8, 11};
     private static final int PRAYER_ATTACK_HIT_DELAY_IN_TICKS = 5;
     private static final int PURPLE_TILE_HIT_DELAY_IN_TICKS = 4;
     private static final int VOID_FLOOR_HIT_DELAY_IN_TICKS = 2;
-    // Both skip the siphon hit
-    private static final int FIRST_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS = 5;
-    private static final int SECOND_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS = 2;
+    // Both skip the attack's own hit
+    private static final int RANGE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS = 5;
+    private static final int MELEE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS = 2;
+    private static final int MIN_UNDER_SLASH_HIT = 20;
     private static final int MIN_VOID_EXPLOSION_HIT = 13;
     private static final int MAX_VOID_EXPLOSION_HIT = 17;
 
@@ -101,7 +105,12 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     // Raider name -> tick they were last hurt by the void floor. It can't hurt the same raider on back-to-back ticks.
     private final Map<String, Integer> lastVoidFloorHitTicks = new HashMap<>();
 
+    // His slashes also cut through him, along the rows and columns they cover
+    private NPC ocellus;
+
     private final Set<Integer> parryHitTicks = new HashSet<>();
+    // Raider name -> their biggest hit this tick
+    private final Map<String, Integer> raiderHits = new HashMap<>();
     // Hit tick -> the prayer needed for it
     private final Map<Integer, HeadIcon> prayerAttackHits = new HashMap<>();
     // The style is a spot anim on Ocellus, which is only certain by the end of the tick he starts the attack
@@ -110,7 +119,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     private int untetherTick;
     private WorldArea untetherArea;
 
-    // -1 when not between his siphon and his prayer attack
+    // -1 when not between his range or melee attack and his prayer attack
     private int voidExplosionStartTick;
     private final Set<String> voidExplosionRaiders = new HashSet<>();
 
@@ -125,6 +134,12 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     @Override
     public void startup() {
         super.startup();
+        for (NPC npc : client.getTopLevelWorldView().npcs()) {
+            if (npc.getId() == NpcID.TFA_OCELLUS_P3) {
+                ocellus = npc;
+            }
+        }
+
         // Void floor can already be down when the phase starts
         Tile[][] tiles = client.getTopLevelWorldView().getScene().getTiles()[client.getTopLevelWorldView().getPlane()];
         for (Tile[] column : tiles) {
@@ -145,7 +160,9 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         purpleHitTiles.clear();
         voidFloorTiles.clear();
         lastVoidFloorHitTicks.clear();
+        ocellus = null;
         parryHitTicks.clear();
+        raiderHits.clear();
         prayerAttackHits.clear();
         prayerAttacker = null;
         untetherTick = -1;
@@ -177,11 +194,11 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             mistakes.add(OCELLUS_P3_VOID_GRIEF);
         }
 
-        if (aoeHitTiles.getActiveHitTiles().contains(previousLocation)) {
+        if (isSlashHit(aoeHitTiles, raider)) {
             mistakes.add(OCELLUS_P3_AOE);
         }
 
-        if (insolenceHitTiles.getActiveHitTiles().contains(previousLocation)) {
+        if (isSlashHit(insolenceHitTiles, raider)) {
             mistakes.add(OCELLUS_P3_INSOLENCE);
         }
 
@@ -198,7 +215,8 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             mistakes.add(OCELLUS_P3_PRAYER_ATTACK);
         }
 
-        if (parryHitTicks.contains(tick) && isOffPrayer(raider, HeadIcon.MELEE)) {
+        if (parryHitTicks.contains(tick) && raiderHits.containsKey(raider.getName()) &&
+                isOffPrayer(raider, HeadIcon.MELEE)) {
             mistakes.add(OCELLUS_P3_PARRY);
         }
 
@@ -222,6 +240,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         int tick = client.getTickCount();
         parryHitTicks.remove(tick);
         prayerAttackHits.remove(tick);
+        raiderHits.clear();
         voidExplosionRaiders.clear();
         riftExplosionCount = 0;
         fallingRaiders.clear();
@@ -243,6 +262,25 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         }
 
         return raider.getPlayer().getOverheadIcon() != requiredHeadIcon;
+    }
+
+    private boolean isSlashHit(InstantHitTilesTracker slashHitTiles, Raider raider) {
+        WorldPoint location = raider.getPreviousWorldLocation();
+        if (location == null) {
+            return false;
+        }
+
+        Set<WorldPoint> hitTiles = slashHitTiles.getActiveHitTiles();
+        if (hitTiles.contains(location)) {
+            return true;
+        }
+
+        // Under him is worked out rather than shown, so only count it if it hurt
+        if (ocellus == null || !ocellus.getWorldArea().contains(location) ||
+                raiderHits.getOrDefault(raider.getName(), 0) < MIN_UNDER_SLASH_HIT) {
+            return false;
+        }
+        return hitTiles.stream().anyMatch(tile -> tile.getX() == location.getX() || tile.getY() == location.getY());
     }
 
     private boolean isVoidFloorHit(Raider raider) {
@@ -314,16 +352,19 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             return;
         }
 
-        if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_PRAYER_IN) {
+        ocellus = npc;
+        if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_DEATH) {
+            shutdown();
+        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_PRAYER_IN) {
             for (int offset : PARRY_HIT_OFFSETS) {
                 parryHitTicks.add(tick + offset);
             }
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_PRAYER_OUT) {
             parryHitTicks.removeIf(hitTick -> hitTick > tick);
-        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_DEFLECT_IN) {
-            voidExplosionStartTick = tick + FIRST_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS;
-        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_SOUL_FRAGMENT_START) {
-            voidExplosionStartTick = tick + SECOND_SIPHON_VOID_EXPLOSION_DELAY_IN_TICKS;
+        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_DEFLECT_IN) { // His range attack
+            voidExplosionStartTick = tick + RANGE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS;
+        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_SOUL_FRAGMENT_START) { // His melee attack
+            voidExplosionStartTick = tick + MELEE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS;
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_MELEE_HYBRID) {
             prayerAttacker = npc;
             voidExplosionStartTick = -1;
@@ -350,13 +391,24 @@ public class OcellusP3Detector extends BaseMistakeDetector {
 
     @Subscribe
     public void onHitsplatApplied(HitsplatApplied event) {
-        if (voidExplosionStartTick < 0 || client.getTickCount() < voidExplosionStartTick) return;
         if (!(event.getActor() instanceof Player)) return;
         if (NON_DAMAGE_HITSPLAT_IDS.contains(event.getHitsplat().getHitsplatType())) return;
 
         int amount = event.getHitsplat().getAmount();
-        if (amount >= MIN_VOID_EXPLOSION_HIT && amount <= MAX_VOID_EXPLOSION_HIT) {
+        if (amount > 0) {
+            raiderHits.merge(event.getActor().getName(), amount, Math::max);
+        }
+
+        boolean isVoidExplosionWindow = voidExplosionStartTick >= 0 && client.getTickCount() >= voidExplosionStartTick;
+        if (isVoidExplosionWindow && amount >= MIN_VOID_EXPLOSION_HIT && amount <= MAX_VOID_EXPLOSION_HIT) {
             voidExplosionRaiders.add(event.getActor().getName());
+        }
+    }
+
+    @Subscribe
+    public void onActorDeath(ActorDeath event) {
+        if (event.getActor() instanceof NPC && ((NPC) event.getActor()).getId() == NpcID.TFA_OCELLUS_P3) {
+            shutdown();
         }
     }
 
