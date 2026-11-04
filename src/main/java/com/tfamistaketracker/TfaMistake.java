@@ -71,6 +71,8 @@ public enum TfaMistake {
             "I'm failing my 2-tick!", "ocellus-p3.png"),
     OCELLUS_P3_PARRY("Ocellus P3 Parry", TfaMistakeTrackerConfig::ocellusP3ParryMessage, "I missed the parry!",
             "ocellus-p3.png"),
+    OCELLUS_P3_TANK_MAGE("Ocellus P3 Tank Mage", TfaMistakeTrackerConfig::ocellusP3TankMageMessage,
+            "I'm PKing my team!", "ocellus-p3.png"),
     OCELLUS_P3_RIFT_EXPLOSION("Ocellus P3 Rift Explosion", TfaMistakeTrackerConfig::ocellusP3RiftExplosionMessage,
             "We failed to destroy it!", "ocellus-p3.png"),
     OCELLUS_P3_UNTETHER("Ocellus P3 Untether", TfaMistakeTrackerConfig::ocellusP3UntetherMessage, "Space is bad!",

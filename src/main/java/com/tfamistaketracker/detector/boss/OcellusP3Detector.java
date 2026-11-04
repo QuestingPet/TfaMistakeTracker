@@ -50,6 +50,7 @@ import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_INSOLENCE;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_PARRY;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_PRAYER_ATTACK;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_RIFT_EXPLOSION;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_TANK_MAGE;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_UNTETHER;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_EXPLOSION;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_GRIEF;
@@ -59,7 +60,8 @@ import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_GRIEF;
  * first everything outside him, then under him a tick later. During his parry and his hybrid attack, raiders have to
  * pray correctly when the hits land, and rifts that aren't dealt with in time explode on everyone. After his range and
  * melee attacks, void explosions chase each raider until his next prayer attack. Only your own are visible, so they're
- * recognised by damage. Nothing counts once he starts dying.
+ * recognised by damage. If his target isn't in melee range he hits everyone with magic instead, which is on the tank.
+ * Nothing counts once he starts dying.
  */
 @Slf4j
 @Singleton
@@ -116,6 +118,10 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     // The style is a spot anim on Ocellus, which is only certain by the end of the tick he starts the attack
     private NPC prayerAttacker;
 
+    // Prayer against his magic counts when he starts casting, not when it lands
+    private int tankMageTick;
+    private String tankMageTank;
+
     private int untetherTick;
     private WorldArea untetherArea;
 
@@ -127,6 +133,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     private final Set<String> fallingRaiders = new HashSet<>();
 
     public OcellusP3Detector() {
+        tankMageTick = -1;
         untetherTick = -1;
         voidExplosionStartTick = -1;
     }
@@ -165,6 +172,8 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         raiderHits.clear();
         prayerAttackHits.clear();
         prayerAttacker = null;
+        tankMageTick = -1;
+        tankMageTank = null;
         untetherTick = -1;
         untetherArea = null;
         voidExplosionStartTick = -1;
@@ -220,6 +229,10 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             mistakes.add(OCELLUS_P3_PARRY);
         }
 
+        if (tick == tankMageTick && raider.getName().equals(tankMageTank) && isAnyoneOffMagic()) {
+            mistakes.add(OCELLUS_P3_TANK_MAGE);
+        }
+
         for (int i = 0; i < riftExplosionCount; i++) {
             mistakes.add(OCELLUS_P3_RIFT_EXPLOSION);
         }
@@ -262,6 +275,12 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         }
 
         return raider.getPlayer().getOverheadIcon() != requiredHeadIcon;
+    }
+
+    // His magic hits everyone, so it's only a mistake if someone isn't protected from it
+    private boolean isAnyoneOffMagic() {
+        return raidState.getRaiders().values().stream()
+                .anyMatch(r -> !r.isDead() && r.getPlayer().getOverheadIcon() != HeadIcon.MAGIC);
     }
 
     private boolean isSlashHit(InstantHitTilesTracker slashHitTiles, Raider raider) {
@@ -368,6 +387,10 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_MELEE_HYBRID) {
             prayerAttacker = npc;
             voidExplosionStartTick = -1;
+        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_BASIC_PROJECTILE_ALL &&
+                npc.getInteracting() instanceof Player) {
+            tankMageTick = tick;
+            tankMageTank = npc.getInteracting().getName();
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_UNLEASH_OUT) {
             untetherTick = tick;
             untetherArea = npc.getWorldArea();

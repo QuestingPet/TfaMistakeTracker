@@ -460,11 +460,22 @@ public interface TfaMistakeTrackerConfig extends Config {
     }
 
     @ConfigItem(
+            keyName = "ocellusP3TankMageMessage",
+            name = "Ocellus P3 Tank Mage",
+            description = "Message to show when Ocellus hits everyone with magic in phase 3 because the tank wasn't in melee range.",
+            section = ocellusP3MistakeSettings,
+            position = 5
+    )
+    default String ocellusP3TankMageMessage() {
+        return TfaMistake.OCELLUS_P3_TANK_MAGE.getDefaultMessage();
+    }
+
+    @ConfigItem(
             keyName = "ocellusP3RiftExplosionMessage",
             name = "Ocellus P3 Rift Explosion",
             description = "Message to show when a rift explodes in Ocellus phase 3. Every raider gets this mistake.",
             section = ocellusP3MistakeSettings,
-            position = 5
+            position = 6
     )
     default String ocellusP3RiftExplosionMessage() {
         return TfaMistake.OCELLUS_P3_RIFT_EXPLOSION.getDefaultMessage();
@@ -475,7 +486,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P3 Untether",
             description = "Message to show when caught in Ocellus' untether explosion in phase 3.",
             section = ocellusP3MistakeSettings,
-            position = 6
+            position = 7
     )
     default String ocellusP3UntetherMessage() {
         return TfaMistake.OCELLUS_P3_UNTETHER.getDefaultMessage();
@@ -486,7 +497,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P3 Fall",
             description = "Message to show when falling into the abyss in Ocellus phase 3.",
             section = ocellusP3MistakeSettings,
-            position = 7
+            position = 8
     )
     default String ocellusP3FallMessage() {
         return TfaMistake.OCELLUS_P3_FALL.getDefaultMessage();
@@ -497,7 +508,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P3 Prayer Attack",
             description = "Message to show when hit by Ocellus' prayer attack in phase 4 without the matching prayer.",
             section = ocellusP3MistakeSettings,
-            position = 8
+            position = 9
     )
     default String ocellusP3PrayerAttackMessage() {
         return TfaMistake.OCELLUS_P3_PRAYER_ATTACK.getDefaultMessage();
