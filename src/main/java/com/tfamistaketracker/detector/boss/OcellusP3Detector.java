@@ -267,6 +267,16 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         overlay.renderHitTiles(voidGriefHitTiles);
         overlay.renderHitTiles(purpleHitTiles);
         overlay.renderLastingTiles(voidFloorTiles.keySet());
+
+        // Everything outside him is hit first, then under him
+        if (untetherArea != null) {
+            int tick = client.getTickCount();
+            if (tick == untetherTick) {
+                overlay.renderSafeTiles(untetherArea.toWorldPointList());
+            } else if (tick == untetherTick + 1) {
+                overlay.renderActiveTiles(untetherArea.toWorldPointList());
+            }
+        }
     }
 
     private boolean isOffPrayer(Raider raider, HeadIcon requiredHeadIcon) {

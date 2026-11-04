@@ -42,6 +42,7 @@ public class DebugTilesOverlay extends Overlay {
     private static final Color ACTIVE_COLOR = Color.GREEN;
     private static final Color PENDING_COLOR = Color.RED;
     private static final Color LASTING_COLOR = Color.ORANGE;
+    private static final Color SAFE_COLOR = Color.WHITE;
     private static final Color RAIDER_COLOR = Color.MAGENTA;
     private static final Color PROJECTILE_COLOR = Color.CYAN;
 
@@ -106,6 +107,14 @@ public class DebugTilesOverlay extends Overlay {
 
     public void renderLastingTiles(Collection<WorldPoint> tiles) {
         tiles.forEach(tile -> renderTile(tile, LASTING_COLOR, null));
+    }
+
+    public void renderSafeTiles(Collection<WorldPoint> tiles) {
+        tiles.forEach(tile -> renderTile(tile, SAFE_COLOR, "safe"));
+    }
+
+    public void renderActiveTiles(Collection<WorldPoint> tiles) {
+        tiles.forEach(tile -> renderTile(tile, ACTIVE_COLOR, null));
     }
 
     public void renderProjectiles(OverheadTracker tracker) {
