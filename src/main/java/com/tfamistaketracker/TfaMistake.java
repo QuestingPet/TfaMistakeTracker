@@ -41,8 +41,9 @@ public enum TfaMistake {
     BORK_MELEE("Bork Melee", TfaMistakeTrackerConfig::borkMeleeMessage, "He's hitting me!", "bork-melee.png"),
     BORK_SMORKS_AA("Bork Smorks Auto Attack", TfaMistakeTrackerConfig::borkSmorksAaMessage,
             "Whoops wrong prayer!", "bork-smorks-aa.png"),
-    BORK_FIRE("Bork Fire", TfaMistakeTrackerConfig::borkFireMessage, "It burns!", "bork.png"),
-    BORK_FIREBALL("Bork Fireball", TfaMistakeTrackerConfig::borkFireballMessage, "I got cannonballed!", "bork.png"),
+    BORK_FIRE("Bork Fire", TfaMistakeTrackerConfig::borkFireMessage, "It burns!", "bork-smorks-fire-tile.png"),
+    BORK_FIREBALL("Bork Fireball", TfaMistakeTrackerConfig::borkFireballMessage, "I got cannonballed!",
+            "bork-smorks-fireball.png"),
 
     // Dreadnoth
     DREADNOTH_SLAM("Dreadnoth Slam", TfaMistakeTrackerConfig::dreadnothSlamMessage, "It's an earthquake!",
@@ -74,7 +75,7 @@ public enum TfaMistake {
     OCELLUS_P2_PURPLE_TILE("Ocellus P2 Purple Tile", TfaMistakeTrackerConfig::ocellusP2PurpleTileMessage,
             "I stood on purple!", "ocellus-p2.png"),
     OCELLUS_P3_VOID_GRIEF("Ocellus P3 Void Grief", TfaMistakeTrackerConfig::ocellusP3VoidGriefMessage,
-            "Who griefed this tile?", "ocellus-p3.png"),
+            "Who griefed this tile?", "ocellus-p3-void-grief.png"),
     OCELLUS_P3_AOE("Ocellus P3 AOE", TfaMistakeTrackerConfig::ocellusP3AoeMessage, "I'm getting sweeped!",
             "ocellus-p3.png"),
     OCELLUS_P3_INSOLENCE("Ocellus P3 Insolence", TfaMistakeTrackerConfig::ocellusP3InsolenceMessage, "Insulin!",
