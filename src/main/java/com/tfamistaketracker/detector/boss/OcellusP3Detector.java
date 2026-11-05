@@ -47,12 +47,12 @@ import static com.tfamistaketracker.TfaMistake.OCELLUS_P2_PURPLE_TILE;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_AOE;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_FALL;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_INSOLENCE;
-import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_PARRY;
-import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_PRAYER_ATTACK;
-import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_RIFT_EXPLOSION;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_MELEE_PARRY;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P4_PRAYER_ATTACK;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_FLARE_DETONATION;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_TANK_MAGE;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_UNTETHER;
-import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_EXPLOSION;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P4_VOID_EXPLOSION;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_GRIEF;
 
 /**
@@ -76,7 +76,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             SpotanimID.VFX_OCELLUS_PHASE3_MELEE_HYBRID_MAGIC, HeadIcon.MAGIC,
             SpotanimID.VFX_OCELLUS_PHASE3_MELEE_HYBRID_RANGED, HeadIcon.RANGED);
 
-    private static final Set<Integer> RIFT_EXPLOSION_ANIMATION_IDS = ImmutableSet.of(
+    private static final Set<Integer> VOID_FLARE_DETONATION_ANIMATION_IDS = ImmutableSet.of(
             AnimationID.VFX_OCELLUS_VOIDFLARE_DEFAULT_DETONATE,
             AnimationID.VFX_OCELLUS_VOIDFLARE_HEAL_DETONATE,
             AnimationID.VFX_OCELLUS_VOIDFLARE_BUFF_DETONATE);
@@ -84,6 +84,11 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     // The parry hits 1 tick after it starts, then every 3 ticks from 5 ticks after, until it ends. Every raider gets a
     // hitsplat on each hit, so it only counts if they took damage.
     private static final int[] PARRY_HIT_OFFSETS = {1, 5, 8, 11};
+    // Any other animation cuts the parry short, e.g. destroying a quadrant
+    private static final Set<Integer> PARRY_ANIMATION_IDS = ImmutableSet.of(
+            AnimationID.NPC_OCELLUS_PHASE3_PRAYER_IN,
+            AnimationID.NPC_OCELLUS_PHASE3_PRAYER_LOOP,
+            AnimationID.NPC_OCELLUS_PHASE3_PRAYER_OUT);
     private static final int PRAYER_ATTACK_HIT_DELAY_IN_TICKS = 5;
     private static final int PURPLE_TILE_HIT_DELAY_IN_TICKS = 4;
     private static final int VOID_FLOOR_HIT_DELAY_IN_TICKS = 2;
@@ -129,7 +134,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     private int voidExplosionStartTick;
     private final Set<String> voidExplosionRaiders = new HashSet<>();
 
-    private int riftExplosionCount;
+    private int voidFlareDetonationCount;
     private final Set<String> fallingRaiders = new HashSet<>();
 
     public OcellusP3Detector() {
@@ -178,7 +183,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         untetherArea = null;
         voidExplosionStartTick = -1;
         voidExplosionRaiders.clear();
-        riftExplosionCount = 0;
+        voidFlareDetonationCount = 0;
         fallingRaiders.clear();
     }
 
@@ -212,7 +217,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         }
 
         if (voidExplosionRaiders.contains(raider.getName())) {
-            mistakes.add(OCELLUS_P3_VOID_EXPLOSION);
+            mistakes.add(OCELLUS_P4_VOID_EXPLOSION);
         }
 
         if (purpleHitTiles.getActiveHitTiles().contains(previousLocation)) {
@@ -221,20 +226,20 @@ public class OcellusP3Detector extends BaseMistakeDetector {
 
         HeadIcon prayerAttackStyle = prayerAttackHits.get(tick);
         if (prayerAttackStyle != null && isOffPrayer(raider, prayerAttackStyle)) {
-            mistakes.add(OCELLUS_P3_PRAYER_ATTACK);
+            mistakes.add(OCELLUS_P4_PRAYER_ATTACK);
         }
 
         if (parryHitTicks.contains(tick) && raiderHits.containsKey(raider.getName()) &&
                 isOffPrayer(raider, HeadIcon.MELEE)) {
-            mistakes.add(OCELLUS_P3_PARRY);
+            mistakes.add(OCELLUS_P3_MELEE_PARRY);
         }
 
         if (tick == tankMageTick && raider.getName().equals(tankMageTank) && isAnyoneOffMagic()) {
             mistakes.add(OCELLUS_P3_TANK_MAGE);
         }
 
-        for (int i = 0; i < riftExplosionCount; i++) {
-            mistakes.add(OCELLUS_P3_RIFT_EXPLOSION);
+        for (int i = 0; i < voidFlareDetonationCount; i++) {
+            mistakes.add(OCELLUS_P3_VOID_FLARE_DETONATION);
         }
 
         if (isUntetherHit(previousLocation)) {
@@ -255,7 +260,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         prayerAttackHits.remove(tick);
         raiderHits.clear();
         voidExplosionRaiders.clear();
-        riftExplosionCount = 0;
+        voidFlareDetonationCount = 0;
         fallingRaiders.clear();
     }
 
@@ -375,13 +380,17 @@ public class OcellusP3Detector extends BaseMistakeDetector {
 
         NPC npc = (NPC) actor;
         int tick = client.getTickCount();
-        if (RIFT_EXPLOSION_ANIMATION_IDS.contains(npc.getAnimation())) {
-            riftExplosionCount++;
+        if (VOID_FLARE_DETONATION_ANIMATION_IDS.contains(npc.getAnimation())) {
+            voidFlareDetonationCount++;
         } else if (npc.getId() != NpcID.TFA_OCELLUS_P3) {
             return;
         }
 
         ocellus = npc;
+        if (npc.getAnimation() != -1 && !PARRY_ANIMATION_IDS.contains(npc.getAnimation())) {
+            parryHitTicks.removeIf(hitTick -> hitTick > tick);
+        }
+
         if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_DEATH) {
             shutdown();
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_PRAYER_IN) {

@@ -1,6 +1,7 @@
 package com.tfamistaketracker.panel;
 
 import com.tfamistaketracker.TfaMistake;
+import com.tfamistaketracker.TfaMistakeTrackerPlugin;
 import com.tfamistaketracker.mistakestate.MistakeStateManager;
 import com.tfamistaketracker.mistakestate.MistakeStateReader;
 import net.runelite.api.Client;
@@ -9,6 +10,7 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.PluginErrorPanel;
 import net.runelite.client.util.ColorUtil;
+import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.QuantityFormatter;
 import net.runelite.client.util.SwingUtil;
 
@@ -17,6 +19,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -24,11 +27,13 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JRadioButton;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -49,6 +54,16 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
     private static final String HTML_LABEL_TEMPLATE =
             "<html><body style='color:%s'>%s<span style='color:white'>%s</span></body></html>";
 
+    private static final boolean DEFAULT_IS_RAID_DEATHS = false;
+
+    private static final ImageIcon RAID_DEATHS_ICON;
+    private static final ImageIcon RAID_DEATHS_ICON_FADED;
+    private static final ImageIcon RAID_DEATHS_ICON_HOVER;
+
+    private static final ImageIcon ROOM_DEATHS_ICON;
+    private static final ImageIcon ROOM_DEATHS_ICON_FADED;
+    private static final ImageIcon ROOM_DEATHS_ICON_HOVER;
+
     private final Client client;
 
     private final MistakeStateManager mistakeStateManager;
@@ -57,6 +72,9 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
 
     private final JLabel currentViewTitle = new JLabel();
     private final JButton switchMistakesViewBtn = new JButton();
+
+    private final JRadioButton raidDeathsBtn = new JRadioButton();
+    private final JRadioButton roomDeathsBtn = new JRadioButton();
 
     // Panel for overall mistake data
     private final JPanel overallPanel = new JPanel();
@@ -71,10 +89,27 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
     // Keep track of all boxes
     private final List<PlayerMistakesBox> playerMistakesBoxes = new ArrayList<>();
 
+    // Keep track of the current death grouping
+    private boolean isRaidDeaths;
     // Keep track of the current view we're showing
     private boolean isShowingAll = false;
 
     private final PluginErrorPanel errorPanel = new PluginErrorPanel();
+
+    static {
+        final BufferedImage raidDeathsImg = ImageUtil.loadImageResource(
+                TfaMistakeTrackerPlugin.class, "raid-deaths.png");
+        final BufferedImage roomDeathsImg = ImageUtil.loadImageResource(
+                TfaMistakeTrackerPlugin.class, "room-deaths.png");
+
+        RAID_DEATHS_ICON = new ImageIcon(raidDeathsImg);
+        RAID_DEATHS_ICON_FADED = new ImageIcon(ImageUtil.alphaOffset(raidDeathsImg, -180));
+        RAID_DEATHS_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(raidDeathsImg, -220));
+
+        ROOM_DEATHS_ICON = new ImageIcon(roomDeathsImg);
+        ROOM_DEATHS_ICON_FADED = new ImageIcon(ImageUtil.alphaOffset(roomDeathsImg, -180));
+        ROOM_DEATHS_ICON_HOVER = new ImageIcon(ImageUtil.alphaOffset(roomDeathsImg, -220));
+    }
 
     @Inject
     public TfaMistakeTrackerPanel(Client client, MistakeStateReader mistakeStateReader,
@@ -93,7 +128,7 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
         add(layoutPanel, BorderLayout.NORTH);
 
         // Create panel for the header (contains things like view, action buttons, etc.)
-        JPanel headerContainer = new JPanel(new GridLayout(1, 1, 0, 0));
+        JPanel headerContainer = new JPanel(new GridLayout(2, 1, 0, 0));
         headerContainer.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
         // Create the view container
@@ -135,6 +170,38 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
         viewContainer.add(switchMistakesViewBtn, BorderLayout.EAST);
         headerContainer.add(viewContainer);
 
+        // Create the panel for the action buttons
+        final JPanel actionButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        actionButtons.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+        actionButtons.setPreferredSize(new Dimension(0, 30));
+        actionButtons.setBorder(new EmptyBorder(5, 5, 5, 10));
+
+        // Create the raid deaths button
+        SwingUtil.removeButtonDecorations(raidDeathsBtn);
+        raidDeathsBtn.setIcon(RAID_DEATHS_ICON_FADED);
+        raidDeathsBtn.setRolloverIcon(RAID_DEATHS_ICON_HOVER);
+        raidDeathsBtn.setSelectedIcon(RAID_DEATHS_ICON);
+        raidDeathsBtn.setToolTipText("Group all raid deaths into a singular mistake");
+        raidDeathsBtn.addActionListener(e -> changeDeathGrouping(true));
+
+        // Create the room deaths button
+        SwingUtil.removeButtonDecorations(roomDeathsBtn);
+        roomDeathsBtn.setIcon(ROOM_DEATHS_ICON_FADED);
+        roomDeathsBtn.setRolloverIcon(ROOM_DEATHS_ICON_HOVER);
+        roomDeathsBtn.setSelectedIcon(ROOM_DEATHS_ICON);
+        roomDeathsBtn.setToolTipText("Show each room's deaths as their own mistakes");
+        roomDeathsBtn.addActionListener(e -> changeDeathGrouping(false));
+
+        ButtonGroup raidRoomGroup = new ButtonGroup();
+        raidRoomGroup.add(raidDeathsBtn);
+        raidRoomGroup.add(roomDeathsBtn);
+
+        // Add all action buttons to the header
+        actionButtons.add(raidDeathsBtn);
+        actionButtons.add(roomDeathsBtn);
+        headerContainer.add(actionButtons);
+
+        changeDeathGrouping(DEFAULT_IS_RAID_DEATHS);
         headerContainer.setVisible(true);
 
         // Create panel that will contain overall data (at the top)
@@ -241,7 +308,7 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
         mistakeStateManager.addMistakeForPlayer(playerName, mistake);
 
         PlayerMistakesBox box = buildBox(playerName);
-        box.rebuildAllMistakes();
+        box.rebuildAllMistakes(isRaidDeaths);
         updateOverallPanel();
 
         // Ensure ordering is correct
@@ -284,7 +351,7 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
             buildBox(playerName);
         }
 
-        playerMistakesBoxes.forEach(box -> box.rebuildAllMistakes());
+        playerMistakesBoxes.forEach(box -> box.rebuildAllMistakes(isRaidDeaths));
         updateOverallPanel();
         reorderRaiderBoxes();
         mistakesContainer.revalidate();
@@ -410,6 +477,12 @@ public class TfaMistakeTrackerPanel extends PluginPanel {
             overallPanel.setVisible(true);
             mistakesContainer.setVisible(true);
         }
+    }
+
+    private void changeDeathGrouping(boolean isRaid) {
+        isRaidDeaths = isRaid;
+        (isRaid ? raidDeathsBtn : roomDeathsBtn).setSelected(true);
+        rebuildAll();
     }
 
     private void switchMistakesView() {

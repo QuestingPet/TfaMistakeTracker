@@ -46,6 +46,7 @@ public class TfaMistakeTrackerPlugin extends Plugin {
     public static final int CYCLES_PER_GAME_TICK = Constants.GAME_TICK_LENGTH / Constants.CLIENT_TICK_LENGTH;
 
     public static final String CONFIG_GROUP = "tfaMistakeTracker";
+    static final String SHOW_SIDE_PANEL_CONFIG_KEY = "showSidePanel";
 
     private static final int OVERHEAD_TEXT_TICK_TIMEOUT = 5;
     private static final int CYCLES_FOR_OVERHEAD_TEXT = OVERHEAD_TEXT_TICK_TIMEOUT * CYCLES_PER_GAME_TICK;
@@ -120,7 +121,7 @@ public class TfaMistakeTrackerPlugin extends Plugin {
                 .priority(5)
                 .panel(panel)
                 .build();
-        clientToolbar.addNavigation(navButton);
+        updateSidePanel();
 
         // Add debug overlays and logging
         overlayManager.add(debugOverlayPanel);
@@ -250,9 +251,21 @@ public class TfaMistakeTrackerPlugin extends Plugin {
         panel.newRaid(event.getRaiderNames());
     }
 
+    private void updateSidePanel() {
+        if (config.showSidePanel()) {
+            clientToolbar.addNavigation(navButton);
+        } else {
+            clientToolbar.removeNavigation(navButton);
+        }
+    }
+
     @Subscribe
     public void onConfigChanged(ConfigChanged event) {
         if (!CONFIG_GROUP.equals(event.getGroup())) return;
+
+        if (SHOW_SIDE_PANEL_CONFIG_KEY.equals(event.getKey())) {
+            updateSidePanel();
+        }
 
         // DEBUG ONLY -- used for debugging with hotswap. Remove before publishing.
         if ("resetDetectors".equals(event.getKey())) {

@@ -36,7 +36,7 @@ import static com.tfamistaketracker.RaidRoom.ARCHIVE_GUARDIAN;
 import static com.tfamistaketracker.TfaMistake.ARCHIVE_GUARDIAN_MELEE;
 import static com.tfamistaketracker.TfaMistake.ARCHIVE_GUARDIAN_MUSHROOM;
 import static com.tfamistaketracker.TfaMistake.ARCHIVE_GUARDIAN_RANGE;
-import static com.tfamistaketracker.TfaMistake.ARCHIVE_GUARDIAN_SLAM;
+import static com.tfamistaketracker.TfaMistake.ARCHIVE_GUARDIAN_FALL;
 import static com.tfamistaketracker.TfaMistake.ARCHIVE_GUARDIAN_VINE;
 
 /**
@@ -57,7 +57,7 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
             SpotanimID.VFX_GUARDIAN_RANGED_PROJANIM01,
             OverheadTracker.Attack.of(HeadIcon.RANGED, OverheadTracker.PrayerCheck.ANIMATION));
 
-    private static final int SLAM_DISTANCE = 1;
+    private static final int FALL_DISTANCE = 1;
     private static final int VINE_DISTANCE = 1;
     private static final int MUSHROOM_DISTANCE = 1;
     private static final int MELEE_HIT_DELAY_IN_TICKS = 1;
@@ -68,7 +68,7 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     // Nothing in the room hurts once the guardian starts dying
     private boolean isGuardianDead;
 
-    private final InstantHitTilesTracker slamHitTiles = new InstantHitTilesTracker();
+    private final InstantHitTilesTracker fallHitTiles = new InstantHitTilesTracker();
     private final DelayedHitTilesTracker meleeHitTiles = new DelayedHitTilesTracker();
     private final OverheadTracker rangeOverheadTracker = new OverheadTracker(RANGE_ATTACKS);
     private final DelayedHitTilesTracker mushroomHitTiles = new DelayedHitTilesTracker();
@@ -87,7 +87,7 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
 
     private void clearTrackers() {
         rangeAttacker = null;
-        slamHitTiles.clear();
+        fallHitTiles.clear();
         meleeHitTiles.clear();
         rangeOverheadTracker.clear();
         mushroomHitTiles.clear();
@@ -106,11 +106,12 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
             return mistakes;
         }
 
-        if (slamHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
-            mistakes.add(ARCHIVE_GUARDIAN_SLAM);
+        if (fallHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
+            mistakes.add(ARCHIVE_GUARDIAN_FALL);
         }
 
-        if (meleeHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
+        if (meleeHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation()) &&
+                !vengeanceTracker.didPopVengeance(raider)) {
             mistakes.add(ARCHIVE_GUARDIAN_MELEE);
         }
 
@@ -136,7 +137,7 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
     // DEBUG ONLY -- remove before publishing
     @Override
     public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderHitTiles(slamHitTiles);
+        overlay.renderHitTiles(fallHitTiles);
         overlay.renderHitTiles(meleeHitTiles);
         overlay.renderProjectiles(rangeOverheadTracker);
         overlay.renderHitTiles(mushroomHitTiles);
@@ -153,7 +154,7 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
 
     @Subscribe
     public void onGameTick(GameTick event) {
-        slamHitTiles.onGameTick(client.getTickCount());
+        fallHitTiles.onGameTick(client.getTickCount());
         meleeHitTiles.onGameTick(client.getTickCount());
         rangeOverheadTracker.onGameTick(client.getTickCount());
         if (rangeAttacker != null) {
@@ -174,7 +175,7 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
             if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_DEATH01) {
                 onGuardianDeath();
             } else if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_IDLE_TO_GROUND01) {
-                computeTilesAround(npc.getWorldArea(), SLAM_DISTANCE).forEach(slamHitTiles::add);
+                computeTilesAround(npc.getWorldArea(), FALL_DISTANCE).forEach(fallHitTiles::add);
             } else if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_RANGE_ATTACK01) {
                 rangeAttacker = npc;
             } else if (npc.getAnimation() == AnimationID.NPC_ARCHIVE_GUARDIAN_MELEE_ATTACK01) {

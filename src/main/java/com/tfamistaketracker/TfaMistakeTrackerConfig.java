@@ -43,10 +43,21 @@ public interface TfaMistakeTrackerConfig extends Config {
         return StackingBehavior.SAME_MISTAKES_ONLY;
     }
 
+    @ConfigItem(
+            keyName = TfaMistakeTrackerPlugin.SHOW_SIDE_PANEL_CONFIG_KEY,
+            name = "Show Side Panel",
+            description = "Whether or not to show the Tfa Mistake Tracker side panel. Mistakes are still tracked " +
+                    "while the side panel is hidden.",
+            position = 3
+    )
+    default boolean showSidePanel() {
+        return true;
+    }
+
     @ConfigSection(
             name = "Death Messages",
             description = "Settings for the messages shown on Death mistakes (separate multiple messages by \"|\").",
-            position = 3,
+            position = 4,
             closedByDefault = true
     )
     String deathMistakeSettings = "deathMistakeSettings";
@@ -65,20 +76,20 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Archive Guardian Mistake Messages",
             description = "Settings for the messages shown on Archive Guardian mistakes (separate multiple messages by \"|\").",
-            position = 4,
+            position = 5,
             closedByDefault = true
     )
     String archiveGuardianMistakeSettings = "archiveGuardianMistakeSettings";
 
     @ConfigItem(
-            keyName = "archiveGuardianSlamMessage",
-            name = "Archive Guardian Slam",
-            description = "Message to show when hit by the Archive Guardian's slam when he drops down.",
+            keyName = "archiveGuardianFallMessage",
+            name = "Archive Guardian Fall",
+            description = "Message to show when hit by the Archive Guardian falling down.",
             section = archiveGuardianMistakeSettings,
             position = 0
     )
-    default String archiveGuardianSlamMessage() {
-        return TfaMistake.ARCHIVE_GUARDIAN_SLAM.getDefaultMessage();
+    default String archiveGuardianFallMessage() {
+        return TfaMistake.ARCHIVE_GUARDIAN_FALL.getDefaultMessage();
     }
 
     @ConfigItem(
@@ -128,7 +139,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Bork Mistake Messages",
             description = "Settings for the messages shown on Bork mistakes (separate multiple messages by \"|\").",
-            position = 5,
+            position = 6,
             closedByDefault = true
     )
     String borkMistakeSettings = "borkMistakeSettings";
@@ -191,7 +202,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Dreadnoth Mistake Messages",
             description = "Settings for the messages shown on Dreadnoth mistakes (separate multiple messages by \"|\").",
-            position = 6,
+            position = 7,
             closedByDefault = true
     )
     String dreadnothMistakeSettings = "dreadnothMistakeSettings";
@@ -276,7 +287,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Xarth Mistake Messages",
             description = "Settings for the messages shown on Xarth mistakes (separate multiple messages by \"|\").",
-            position = 7,
+            position = 8,
             closedByDefault = true
     )
     String xarthMistakeSettings = "xarthMistakeSettings";
@@ -339,7 +350,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Ocellus P1 Mistake Messages",
             description = "Settings for the messages shown on Ocellus phase 1 mistakes (separate multiple messages by \"|\").",
-            position = 8,
+            position = 9,
             closedByDefault = true
     )
     String ocellusP1MistakeSettings = "ocellusP1MistakeSettings";
@@ -369,7 +380,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Ocellus P2 Mistake Messages",
             description = "Settings for the messages shown on Ocellus phase 2 mistakes (separate multiple messages by \"|\").",
-            position = 9,
+            position = 10,
             closedByDefault = true
     )
     String ocellusP2MistakeSettings = "ocellusP2MistakeSettings";
@@ -399,7 +410,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Ocellus P3 Mistake Messages",
             description = "Settings for the messages shown on Ocellus phase 3 mistakes (separate multiple messages by \"|\").",
-            position = 10,
+            position = 11,
             closedByDefault = true
     )
     String ocellusP3MistakeSettings = "ocellusP3MistakeSettings";
@@ -438,25 +449,14 @@ public interface TfaMistakeTrackerConfig extends Config {
     }
 
     @ConfigItem(
-            keyName = "ocellusP3VoidExplosionMessage",
-            name = "Ocellus P3 Void Explosion",
-            description = "Message to show when caught by a void explosion chasing you after Ocellus' siphon in phase 4.",
+            keyName = "ocellusP3MeleeParryMessage",
+            name = "Ocellus P3 Melee Parry",
+            description = "Message to show when hit during Ocellus' melee parry in phase 3 without praying melee.",
             section = ocellusP3MistakeSettings,
             position = 3
     )
-    default String ocellusP3VoidExplosionMessage() {
-        return TfaMistake.OCELLUS_P3_VOID_EXPLOSION.getDefaultMessage();
-    }
-
-    @ConfigItem(
-            keyName = "ocellusP3ParryMessage",
-            name = "Ocellus P3 Parry",
-            description = "Message to show when hit during Ocellus' parry in phase 3 without praying melee.",
-            section = ocellusP3MistakeSettings,
-            position = 4
-    )
-    default String ocellusP3ParryMessage() {
-        return TfaMistake.OCELLUS_P3_PARRY.getDefaultMessage();
+    default String ocellusP3MeleeParryMessage() {
+        return TfaMistake.OCELLUS_P3_MELEE_PARRY.getDefaultMessage();
     }
 
     @ConfigItem(
@@ -464,21 +464,21 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P3 Tank Mage",
             description = "Message to show when Ocellus hits everyone with magic in phase 3 because the tank wasn't in melee range.",
             section = ocellusP3MistakeSettings,
-            position = 5
+            position = 4
     )
     default String ocellusP3TankMageMessage() {
         return TfaMistake.OCELLUS_P3_TANK_MAGE.getDefaultMessage();
     }
 
     @ConfigItem(
-            keyName = "ocellusP3RiftExplosionMessage",
-            name = "Ocellus P3 Rift Explosion",
-            description = "Message to show when a rift explodes in Ocellus phase 3. Every raider gets this mistake.",
+            keyName = "ocellusP3VoidFlareDetonationMessage",
+            name = "Ocellus P3 Void Flare Detonation",
+            description = "Message to show when a void rift, siphon, or augmenter detonates in Ocellus phase 3. Every raider gets this mistake.",
             section = ocellusP3MistakeSettings,
-            position = 6
+            position = 5
     )
-    default String ocellusP3RiftExplosionMessage() {
-        return TfaMistake.OCELLUS_P3_RIFT_EXPLOSION.getDefaultMessage();
+    default String ocellusP3VoidFlareDetonationMessage() {
+        return TfaMistake.OCELLUS_P3_VOID_FLARE_DETONATION.getDefaultMessage();
     }
 
     @ConfigItem(
@@ -486,7 +486,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P3 Untether",
             description = "Message to show when caught in Ocellus' untether explosion in phase 3.",
             section = ocellusP3MistakeSettings,
-            position = 7
+            position = 6
     )
     default String ocellusP3UntetherMessage() {
         return TfaMistake.OCELLUS_P3_UNTETHER.getDefaultMessage();
@@ -497,28 +497,39 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P3 Fall",
             description = "Message to show when falling into the abyss in Ocellus phase 3.",
             section = ocellusP3MistakeSettings,
-            position = 8
+            position = 7
     )
     default String ocellusP3FallMessage() {
         return TfaMistake.OCELLUS_P3_FALL.getDefaultMessage();
     }
 
     @ConfigItem(
-            keyName = "ocellusP3PrayerAttackMessage",
-            name = "Ocellus P3 Prayer Attack",
+            keyName = "ocellusP4VoidExplosionMessage",
+            name = "Ocellus P4 Void Explosion",
+            description = "Message to show when caught by a void explosion chasing you after Ocellus' siphon in phase 4.",
+            section = ocellusP3MistakeSettings,
+            position = 8
+    )
+    default String ocellusP4VoidExplosionMessage() {
+        return TfaMistake.OCELLUS_P4_VOID_EXPLOSION.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "ocellusP4PrayerAttackMessage",
+            name = "Ocellus P4 Prayer Attack",
             description = "Message to show when hit by Ocellus' prayer attack in phase 4 without the matching prayer.",
             section = ocellusP3MistakeSettings,
             position = 9
     )
-    default String ocellusP3PrayerAttackMessage() {
-        return TfaMistake.OCELLUS_P3_PRAYER_ATTACK.getDefaultMessage();
+    default String ocellusP4PrayerAttackMessage() {
+        return TfaMistake.OCELLUS_P4_PRAYER_ATTACK.getDefaultMessage();
     }
 
     // DEBUG ONLY -- everything in this section is for development and must be removed before publishing
     @ConfigSection(
             name = "Debug",
             description = "Developer tools. Only work in developer mode.",
-            position = 11,
+            position = 12,
             closedByDefault = true
     )
     String debugSettings = "debugSettings";

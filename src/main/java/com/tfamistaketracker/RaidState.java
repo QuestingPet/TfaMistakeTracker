@@ -22,6 +22,7 @@ import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.VarClientStrChanged;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.VarClientID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -44,6 +45,8 @@ public class RaidState {
 
     private static final int TFA_HUD_NAMES_SCRIPT_ID = 10034;
     private static final int TFA_HUD_ORBS_SCRIPT_ID = 10037;
+    // Spectating a raid you're not in, rather than your own after dying
+    private static final int EXTERNAL_SPECTATE_MODE = 2;
 
     private static final List<Integer> TFA_RAIDER_NAME_VARCS = ImmutableList.of(
             VarClientID.TFA_CLIENT_NAME0,
@@ -230,10 +233,13 @@ public class RaidState {
         // Remove raiders no longer in the party
         boolean changed = raiders.keySet().retainAll(raiderNames);
 
-        // Add any raiders in the party that aren't loaded yet
+        // Add any raiders in the party that aren't loaded yet. A spectator isn't one, even if the name varcs are still
+        // left over from their own last raid.
+        boolean isExternalSpectator = client.getVarbitValue(VarbitID.TFA_CLIENT_SPECTATE_MODE) == EXTERNAL_SPECTATE_MODE;
         for (Player player : worldView.players()) {
             if (player != null &&
                     player.getName() != null &&
+                    !(isExternalSpectator && player == client.getLocalPlayer()) &&
                     !raiders.containsKey(player.getName()) &&
                     raiderNames.contains(player.getName())) {
                 raiders.put(player.getName(), new Raider(player));

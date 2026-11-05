@@ -7,28 +7,40 @@ import net.runelite.client.util.ImageUtil;
 import java.awt.image.BufferedImage;
 import java.util.function.Function;
 import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Set;
 
 public enum TfaMistake {
     // Deaths
-    DEATH("Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death.png"),
+    DEATH("Death", (config) -> "", "", "death.png"), // Chat message handled in deaths below
+    DEATH_ARCHIVE_GUARDIAN("Archive Guardian Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(),
+            "death-ag.png"),
+    DEATH_EZEKIEL("Ezekiel Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death.png"),
+    DEATH_BORK("Bork Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death-bork.png"),
+    DEATH_MOIA("Moia Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death.png"),
+    DEATH_DREADNOTH("Dreadnoth Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(),
+            "death-dreadnoth.png"),
+    DEATH_DAGONHAI("Dagon'hai Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death.png"),
+    DEATH_XARTH("Xarth Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death-xarth.png"),
+    DEATH_OCELLUS("Ocellus Death", TfaMistakeTrackerConfig::deathMessage, defaultDeathMessage(), "death-ocellus.png"),
 
     // Archive Guardian
-    ARCHIVE_GUARDIAN_SLAM("Archive Guardian Slam", TfaMistakeTrackerConfig::archiveGuardianSlamMessage,
-            "I'm getting slammed!", "archive-guardian.png"),
+    ARCHIVE_GUARDIAN_FALL("Archive Guardian Fall", TfaMistakeTrackerConfig::archiveGuardianFallMessage,
+            "I'm getting slammed!", "ag-fall.png"),
     ARCHIVE_GUARDIAN_MELEE("Archive Guardian Melee", TfaMistakeTrackerConfig::archiveGuardianMeleeMessage,
-            "Ow that hurt!", "archive-guardian.png"),
+            "Ow that hurt!", "ag-melee.png"),
     ARCHIVE_GUARDIAN_RANGE("Archive Guardian Range", TfaMistakeTrackerConfig::archiveGuardianRangeMessage,
-            "I got rocked!", "archive-guardian.png"),
+            "I got rocked!", "ag-range.png"),
     ARCHIVE_GUARDIAN_MUSHROOM("Archive Guardian Mushroom", TfaMistakeTrackerConfig::archiveGuardianMushroomMessage,
-            "*Cough*", "archive-guardian.png"),
+            "*Cough*", "ag-mushroom.png"),
     ARCHIVE_GUARDIAN_VINE("Archive Guardian Vine", TfaMistakeTrackerConfig::archiveGuardianVineMessage,
-            "Ahh! Tentacles!", "archive-guardian.png"),
+            "Ahh! Tentacles!", "ag-vine.png"),
 
     // Bork
-    BORK_STOMP("Bork Stomp", TfaMistakeTrackerConfig::borkStompMessage, "He's stomping!", "bork.png"),
-    BORK_MELEE("Bork Melee", TfaMistakeTrackerConfig::borkMeleeMessage, "He's hitting me!", "bork.png"),
+    BORK_STOMP("Bork Stomp", TfaMistakeTrackerConfig::borkStompMessage, "He's stomping!", "bork-stomp.png"),
+    BORK_MELEE("Bork Melee", TfaMistakeTrackerConfig::borkMeleeMessage, "He's hitting me!", "bork-melee.png"),
     BORK_SMORKS_AA("Bork Smorks Auto Attack", TfaMistakeTrackerConfig::borkSmorksAaMessage,
-            "Whoops wrong prayer!", "bork.png"),
+            "Whoops wrong prayer!", "bork-smorks-aa.png"),
     BORK_FIRE("Bork Fire", TfaMistakeTrackerConfig::borkFireMessage, "It burns!", "bork.png"),
     BORK_FIREBALL("Bork Fireball", TfaMistakeTrackerConfig::borkFireballMessage, "I got cannonballed!", "bork.png"),
 
@@ -67,23 +79,26 @@ public enum TfaMistake {
             "ocellus-p3.png"),
     OCELLUS_P3_INSOLENCE("Ocellus P3 Insolence", TfaMistakeTrackerConfig::ocellusP3InsolenceMessage, "Insulin!",
             "ocellus-p3.png"),
-    OCELLUS_P3_VOID_EXPLOSION("Ocellus P3 Void Explosion", TfaMistakeTrackerConfig::ocellusP3VoidExplosionMessage,
-            "I'm failing my 2-tick!", "ocellus-p3.png"),
-    OCELLUS_P3_PARRY("Ocellus P3 Parry", TfaMistakeTrackerConfig::ocellusP3ParryMessage, "I missed the parry!",
+    OCELLUS_P3_MELEE_PARRY("Ocellus P3 Melee Parry", TfaMistakeTrackerConfig::ocellusP3MeleeParryMessage, "I missed the parry!",
             "ocellus-p3.png"),
     OCELLUS_P3_TANK_MAGE("Ocellus P3 Tank Mage", TfaMistakeTrackerConfig::ocellusP3TankMageMessage,
             "I'm PKing my team!", "ocellus-p3.png"),
-    OCELLUS_P3_RIFT_EXPLOSION("Ocellus P3 Rift Explosion", TfaMistakeTrackerConfig::ocellusP3RiftExplosionMessage,
+    OCELLUS_P3_VOID_FLARE_DETONATION("Ocellus P3 Void Flare Detonation", TfaMistakeTrackerConfig::ocellusP3VoidFlareDetonationMessage,
             "We failed to destroy it!", "ocellus-p3.png"),
     OCELLUS_P3_UNTETHER("Ocellus P3 Untether", TfaMistakeTrackerConfig::ocellusP3UntetherMessage, "Space is bad!",
             "ocellus-p3.png"),
     OCELLUS_P3_FALL("Ocellus P3 Fall", TfaMistakeTrackerConfig::ocellusP3FallMessage, "I'm falling into space!",
             "ocellus-p3.png"),
-    OCELLUS_P3_PRAYER_ATTACK("Ocellus P3 Prayer Attack", TfaMistakeTrackerConfig::ocellusP3PrayerAttackMessage,
+    OCELLUS_P4_VOID_EXPLOSION("Ocellus P4 Void Explosion", TfaMistakeTrackerConfig::ocellusP4VoidExplosionMessage,
+            "I'm failing my 2-tick!", "ocellus-p3.png"),
+    OCELLUS_P4_PRAYER_ATTACK("Ocellus P4 Prayer Attack", TfaMistakeTrackerConfig::ocellusP4PrayerAttackMessage,
             "Don't look at me!", "ocellus-p3.png"),
     ;
 
     private static final String FALLBACK_IMAGE_PATH = "death.png";
+
+    private static final Set<TfaMistake> ROOM_DEATHS = EnumSet.of(DEATH_ARCHIVE_GUARDIAN, DEATH_EZEKIEL, DEATH_BORK,
+            DEATH_MOIA, DEATH_DREADNOTH, DEATH_DAGONHAI, DEATH_XARTH, DEATH_OCELLUS);
 
     private static final int MAX_STACKING_CHAT_MESSAGE_LENGTH = 10;
     public static final int MAX_MESSAGE_LENGTH = 40;
@@ -120,6 +135,10 @@ public enum TfaMistake {
 
     public String getChatMessage(TfaMistakeTrackerConfig config) {
         return chatMessageFunc.apply(config);
+    }
+
+    public static boolean isRoomDeath(TfaMistake mistake) {
+        return ROOM_DEATHS.contains(mistake);
     }
 
     public static String defaultDeathMessage() {

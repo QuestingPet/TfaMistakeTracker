@@ -76,8 +76,8 @@ public class PlayerMistakesBox extends JPanel {
         setComponentPopupMenu(popupMenu);
     }
 
-    void rebuildAllMistakes() {
-        buildMistakes();
+    void rebuildAllMistakes(boolean isRaidDeaths) {
+        buildMistakes(isRaidDeaths);
 
         final String mistakeString = totalMistakes == 1 ? "Mistake" : "Mistakes";
         mistakeCountLabel.setText(String.format("%s %s", totalMistakes, mistakeString));
@@ -92,12 +92,18 @@ public class PlayerMistakesBox extends JPanel {
         repaint();
     }
 
-    private void buildMistakes() {
+    private void buildMistakes(boolean isRaidDeaths) {
         totalMistakes = 0;
         setVisible(true);
 
         List<TfaMistakeCount> mistakeCountsForPlayer = new ArrayList<>();
         for (TfaMistake mistake : TfaMistake.values()) {
+            if (isRaidDeaths && TfaMistake.isRoomDeath(mistake)) {
+                continue;
+            } else if (!isRaidDeaths && mistake == TfaMistake.DEATH) {
+                continue;
+            }
+
             int mistakeCount = mistakeStateManager.getMistakeCountForPlayer(playerName, mistake);
             if (mistakeCount > 0) {
                 totalMistakes += mistakeCount;
