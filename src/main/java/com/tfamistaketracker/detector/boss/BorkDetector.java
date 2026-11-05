@@ -6,19 +6,23 @@ import com.tfamistaketracker.RaidRoom;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
+import com.tfamistaketracker.detector.tracker.AppliedHitsplatsTracker;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
 import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.HeadIcon;
+import net.runelite.api.HitsplatID;
 import net.runelite.api.NPC;
+import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameObjectDespawned;
 import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.GraphicsObjectCreated;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.ProjectileMoved;
 import net.runelite.api.gameval.AnimationID;
 import net.runelite.api.gameval.NpcID;
@@ -80,6 +84,8 @@ public class BorkDetector extends BaseMistakeDetector {
     private final OverheadTracker smorksOverheadTracker = new OverheadTracker(SMORKS_ATTACKS);
     // Fire tile -> tick it spawned. Fire doesn't burn on the tick it spawns.
     private final Map<WorldPoint, Integer> fireTiles = new HashMap<>();
+    // Raiders who land in the arena mid-fight can be on the stomp or melee tiles without getting hit
+    private final AppliedHitsplatsTracker appliedHitsplats = new AppliedHitsplatsTracker();
 
     public BorkDetector() {
         bork = null;
@@ -97,6 +103,7 @@ public class BorkDetector extends BaseMistakeDetector {
         fireballHitTiles.clear();
         smorksOverheadTracker.clear();
         fireTiles.clear();
+        appliedHitsplats.clear();
     }
 
     @Override
@@ -116,7 +123,8 @@ public class BorkDetector extends BaseMistakeDetector {
             mistakes.add(BORK_FIREBALL);
         }
 
-        if (stompHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
+        if (stompHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation()) &&
+                appliedHitsplats.popHitsplatApplied(raider.getName())) {
             mistakes.add(BORK_STOMP);
         }
 
@@ -133,6 +141,7 @@ public class BorkDetector extends BaseMistakeDetector {
 
     @Override
     public void afterDetect() {
+        appliedHitsplats.clear();
     }
 
     // DEBUG ONLY -- remove before publishing
@@ -155,11 +164,11 @@ public class BorkDetector extends BaseMistakeDetector {
             return false;
         }
 
-        if (vengeanceTracker.didPopVengeance(raider)) {
+        if (vengeanceTracker.didPopVengeance(raider) || raider.getPlayer().getOverheadIcon() == HeadIcon.MELEE) {
             return false;
         }
 
-        return raider.getPlayer().getOverheadIcon() != HeadIcon.MELEE;
+        return appliedHitsplats.popHitsplatApplied(raider.getName());
     }
 
     private boolean isSmorksHit(Raider raider) {
@@ -168,6 +177,17 @@ public class BorkDetector extends BaseMistakeDetector {
         }
 
         return smorksOverheadTracker.didMissPrayer(raider);
+    }
+
+    @Subscribe
+    public void onHitsplatApplied(HitsplatApplied event) {
+        if (!(event.getActor() instanceof Player)) return;
+
+        int type = event.getHitsplat().getHitsplatType();
+        if (type == HitsplatID.HEAL || type == HitsplatID.POISON || type == HitsplatID.VENOM ||
+                type == HitsplatID.DISEASE || type == HitsplatID.BURN) return;
+
+        appliedHitsplats.addHitsplatForRaider(event.getActor().getName());
     }
 
     @Subscribe

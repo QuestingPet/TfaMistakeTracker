@@ -5,6 +5,7 @@ import com.tfamistaketracker.RaidRoom;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
+import com.tfamistaketracker.detector.tracker.AppliedHitsplatsTracker;
 import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
 import com.tfamistaketracker.overlay.DebugTilesOverlay;
@@ -12,6 +13,7 @@ import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.HeadIcon;
+import net.runelite.api.HitsplatID;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Projectile;
@@ -22,6 +24,7 @@ import net.runelite.api.events.GameObjectDespawned;
 import net.runelite.api.events.GameObjectSpawned;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.GraphicsObjectCreated;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.api.events.ProjectileMoved;
@@ -79,6 +82,7 @@ public class DreadnothDetector extends BaseMistakeDetector {
     private final OverheadTracker rangeOverheadTracker = new OverheadTracker(RANGE_ATTACKS);
     private final DelayedHitTilesTracker landingHitTiles = new DelayedHitTilesTracker();
     private final DelayedHitTilesTracker bloodBallHitTiles = new DelayedHitTilesTracker();
+    private final AppliedHitsplatsTracker appliedHitsplats = new AppliedHitsplatsTracker();
     private final Set<Projectile> trackedBloodBalls = new HashSet<>();
     // Blood pool tile -> tick it spawned. Pools don't hurt on the tick they spawn.
     private final Map<WorldPoint, Integer> bloodPools = new HashMap<>();
@@ -116,6 +120,7 @@ public class DreadnothDetector extends BaseMistakeDetector {
         trackedBloodBalls.clear();
         bloodPools.clear();
         lastBloodPoolHitTicks.clear();
+        appliedHitsplats.clear();
     }
 
     @Override
@@ -148,7 +153,8 @@ public class DreadnothDetector extends BaseMistakeDetector {
             mistakes.add(DREADNOTH_INSIDE);
         }
 
-        if (bloodBallHitTiles.getActiveHitTiles().contains(previousLocation)) {
+        if (bloodBallHitTiles.getActiveHitTiles().contains(previousLocation) &&
+                appliedHitsplats.popHitsplatApplied(raider.getName())) {
             mistakes.add(DREADNOTH_BLOOD_BALL);
         }
 
@@ -165,6 +171,7 @@ public class DreadnothDetector extends BaseMistakeDetector {
     public void afterDetect() {
         slamTicks.remove(client.getTickCount());
         jellyTargets.clear();
+        appliedHitsplats.clear();
         previousDreadnothArea = dreadnoth == null ? null : dreadnoth.getWorldArea();
     }
 
@@ -226,6 +233,17 @@ public class DreadnothDetector extends BaseMistakeDetector {
         }
 
         return previousDreadnothArea != null && previousDreadnothArea.contains(location);
+    }
+
+    @Subscribe
+    public void onHitsplatApplied(HitsplatApplied event) {
+        if (!(event.getActor() instanceof Player)) return;
+
+        int type = event.getHitsplat().getHitsplatType();
+        if (type == HitsplatID.HEAL || type == HitsplatID.POISON || type == HitsplatID.VENOM ||
+                type == HitsplatID.DISEASE || type == HitsplatID.BURN) return;
+
+        appliedHitsplats.addHitsplatForRaider(event.getActor().getName());
     }
 
     @Subscribe

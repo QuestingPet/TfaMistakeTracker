@@ -51,17 +51,19 @@ import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_MELEE_PARRY;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P4_PRAYER_ATTACK;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_FLARE_DETONATION;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_TANK_MAGE;
-import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_UNTETHER;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_UNTETHER_EXPLOSION;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_UNTETHER_MAGE;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P4_VOID_EXPLOSION;
+import static com.tfamistaketracker.TfaMistake.OCELLUS_P4_VOID_SPACE;
 import static com.tfamistaketracker.TfaMistake.OCELLUS_P3_VOID_GRIEF;
 
 /**
  * In phase 3, Ocellus slashes, drops void bombs that leave void floor behind, and explodes the arena after untethering:
  * first everything outside him, then under him a tick later. During his parry and his hybrid attack, raiders have to
  * pray correctly when the hits land, and rifts that aren't dealt with in time explode on everyone. After his range and
- * melee attacks, void explosions chase each raider until his next prayer attack. Only your own are visible, so they're
- * recognised by damage. If his target isn't in melee range he hits everyone with magic instead, which is on the tank.
- * Nothing counts once he starts dying.
+ * melee attacks, void explosions land on each raider's tile on a fixed schedule, and the tiles under him (range) or
+ * away from him (melee) turn to space. If his target isn't in melee range he hits everyone with magic instead, which is
+ * on the tank. Nothing counts once he starts dying.
  */
 @Slf4j
 @Singleton
@@ -92,12 +94,18 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     private static final int PRAYER_ATTACK_HIT_DELAY_IN_TICKS = 5;
     private static final int PURPLE_TILE_HIT_DELAY_IN_TICKS = 4;
     private static final int VOID_FLOOR_HIT_DELAY_IN_TICKS = 2;
-    // Both skip the attack's own hit
-    private static final int RANGE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS = 5;
-    private static final int MELEE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS = 2;
+    // Ticks from his range or melee attack until it takes half of everyone's health
+    private static final int RANGE_ATTACK_HIT_DELAY_IN_TICKS = 4;
+    private static final int MELEE_ATTACK_HIT_DELAY_IN_TICKS = 1;
+    // Void explosions land on the tile each raider stood on the tick before, then hurt them a tick later if they stayed
+    private static final int FIRST_VOID_EXPLOSION_DELAY_IN_TICKS = 5;
+    private static final int VOID_EXPLOSION_INTERVAL_IN_TICKS = 2;
+    private static final int VOID_EXPLOSION_COUNT = 6;
+    private static final int SPACE_DISTANCE = 1;
+    // In case his end animation never plays. Space lasts 15-17 ticks after the hit.
+    private static final int MAX_SPACE_DURATION_IN_TICKS = 18;
+    private static final int UNTETHER_MAGE_HIT_DELAY_IN_TICKS = 4;
     private static final int MIN_UNDER_SLASH_HIT = 20;
-    private static final int MIN_VOID_EXPLOSION_HIT = 13;
-    private static final int MAX_VOID_EXPLOSION_HIT = 17;
 
     private static final Set<Integer> NON_DAMAGE_HITSPLAT_IDS = ImmutableSet.of(HitsplatID.HEAL, HitsplatID.POISON,
             HitsplatID.VENOM, HitsplatID.DISEASE, HitsplatID.BURN);
@@ -118,6 +126,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     private final Set<Integer> parryHitTicks = new HashSet<>();
     // Raider name -> their biggest hit this tick
     private final Map<String, Integer> raiderHits = new HashMap<>();
+    private final Map<String, Integer> raiderHitCounts = new HashMap<>();
     // Hit tick -> the prayer needed for it
     private final Map<Integer, HeadIcon> prayerAttackHits = new HashMap<>();
     // The style is a spot anim on Ocellus, which is only certain by the end of the tick he starts the attack
@@ -129,10 +138,19 @@ public class OcellusP3Detector extends BaseMistakeDetector {
 
     private int untetherTick;
     private WorldArea untetherArea;
+    // His untether's purple tiles also hit everyone with magic
+    private boolean isUntethering;
+    private final Set<Integer> untetherMageHitTicks = new HashSet<>();
 
-    // -1 when not between his range or melee attack and his prayer attack
-    private int voidExplosionStartTick;
-    private final Set<String> voidExplosionRaiders = new HashSet<>();
+    private final Set<Integer> voidExplosionTicks = new HashSet<>();
+    // Raider name -> the tile the current void explosion landed on
+    private final Map<String, WorldPoint> voidExplosionTiles = new HashMap<>();
+
+    // -1 when there's no space. Range attacks make the tiles under him space, melee attacks everything else.
+    private int spaceStartTick;
+    private int spaceEndTick;
+    private Set<WorldPoint> spaceArea;
+    private boolean isSpaceInside;
 
     private int voidFlareDetonationCount;
     private final Set<String> fallingRaiders = new HashSet<>();
@@ -140,7 +158,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     public OcellusP3Detector() {
         tankMageTick = -1;
         untetherTick = -1;
-        voidExplosionStartTick = -1;
+        spaceStartTick = -1;
     }
 
     @Override
@@ -175,14 +193,19 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         ocellus = null;
         parryHitTicks.clear();
         raiderHits.clear();
+        raiderHitCounts.clear();
         prayerAttackHits.clear();
         prayerAttacker = null;
         tankMageTick = -1;
         tankMageTank = null;
         untetherTick = -1;
         untetherArea = null;
-        voidExplosionStartTick = -1;
-        voidExplosionRaiders.clear();
+        isUntethering = false;
+        untetherMageHitTicks.clear();
+        voidExplosionTicks.clear();
+        voidExplosionTiles.clear();
+        spaceStartTick = -1;
+        spaceArea = null;
         voidFlareDetonationCount = 0;
         fallingRaiders.clear();
     }
@@ -216,8 +239,19 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             mistakes.add(OCELLUS_P3_INSOLENCE);
         }
 
-        if (voidExplosionRaiders.contains(raider.getName())) {
+        // A single hit on a space tile is the space, since the explosion only lands if they didn't move
+        boolean isSpaceHit = isSpaceHit(raider);
+        boolean isVoidExplosionHit = isVoidExplosionHit(raider) &&
+                (!isSpaceHit || raiderHitCounts.getOrDefault(raider.getName(), 0) >= 2);
+        if (isSpaceHit) {
+            mistakes.add(OCELLUS_P4_VOID_SPACE);
+        }
+
+        if (isVoidExplosionHit) {
             mistakes.add(OCELLUS_P4_VOID_EXPLOSION);
+        }
+        if (voidExplosionTicks.contains(tick)) {
+            voidExplosionTiles.put(raider.getName(), previousLocation);
         }
 
         if (purpleHitTiles.getActiveHitTiles().contains(previousLocation)) {
@@ -243,7 +277,12 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         }
 
         if (isUntetherHit(previousLocation)) {
-            mistakes.add(OCELLUS_P3_UNTETHER);
+            mistakes.add(OCELLUS_P3_UNTETHER_EXPLOSION);
+        }
+
+        if (untetherMageHitTicks.contains(tick) && raiderHits.containsKey(raider.getName()) &&
+                isOffPrayer(raider, HeadIcon.MAGIC)) {
+            mistakes.add(OCELLUS_P3_UNTETHER_MAGE);
         }
 
         if (fallingRaiders.contains(raider.getName())) {
@@ -259,7 +298,11 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         parryHitTicks.remove(tick);
         prayerAttackHits.remove(tick);
         raiderHits.clear();
-        voidExplosionRaiders.clear();
+        raiderHitCounts.clear();
+        untetherMageHitTicks.remove(tick);
+        if (voidExplosionTicks.remove(tick - 1)) {
+            voidExplosionTiles.clear();
+        }
         voidFlareDetonationCount = 0;
         fallingRaiders.clear();
     }
@@ -315,6 +358,34 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             return false;
         }
         return hitTiles.stream().anyMatch(tile -> tile.getX() == location.getX() || tile.getY() == location.getY());
+    }
+
+    private boolean isVoidExplosionHit(Raider raider) {
+        WorldPoint explosionTile = voidExplosionTiles.get(raider.getName());
+        return voidExplosionTicks.contains(client.getTickCount() - 1) && explosionTile != null &&
+                explosionTile.equals(raider.getPreviousWorldLocation()) && raiderHits.containsKey(raider.getName());
+    }
+
+    private boolean isSpaceHit(Raider raider) {
+        int tick = client.getTickCount();
+        if (spaceArea == null || tick < spaceStartTick || tick >= spaceEndTick || raider.getPreviousWorldLocation() == null) {
+            return false;
+        }
+
+        return spaceArea.contains(raider.getPreviousWorldLocation()) == isSpaceInside &&
+                raiderHits.containsKey(raider.getName());
+    }
+
+    private void onSiphon(NPC npc, int hitDelay, boolean isSpaceInside) {
+        int hitTick = client.getTickCount() + hitDelay;
+        for (int i = 0; i < VOID_EXPLOSION_COUNT; i++) {
+            voidExplosionTicks.add(hitTick + FIRST_VOID_EXPLOSION_DELAY_IN_TICKS + i * VOID_EXPLOSION_INTERVAL_IN_TICKS);
+        }
+
+        spaceStartTick = hitTick + 1;
+        spaceEndTick = hitTick + MAX_SPACE_DURATION_IN_TICKS;
+        spaceArea = computeTilesAround(npc.getWorldArea(), SPACE_DISTANCE);
+        this.isSpaceInside = isSpaceInside;
     }
 
     private boolean isVoidFloorHit(Raider raider) {
@@ -400,19 +471,25 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_PRAYER_OUT) {
             parryHitTicks.removeIf(hitTick -> hitTick > tick);
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_DEFLECT_IN) { // His range attack
-            voidExplosionStartTick = tick + RANGE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS;
+            onSiphon(npc, RANGE_ATTACK_HIT_DELAY_IN_TICKS, true);
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_SOUL_FRAGMENT_START) { // His melee attack
-            voidExplosionStartTick = tick + MELEE_ATTACK_VOID_EXPLOSION_DELAY_IN_TICKS;
+            onSiphon(npc, MELEE_ATTACK_HIT_DELAY_IN_TICKS, false);
+        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_DEFLECT_OUT ||
+                npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_SOUL_FRAGMENT_END) {
+            spaceArea = null;
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_MELEE_HYBRID) {
             prayerAttacker = npc;
-            voidExplosionStartTick = -1;
+            spaceArea = null;
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_BASIC_PROJECTILE_ALL &&
                 npc.getInteracting() instanceof Player) {
             tankMageTick = tick;
             tankMageTank = npc.getInteracting().getName();
+        } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_UNLEASH_IN) {
+            isUntethering = true;
         } else if (npc.getAnimation() == AnimationID.NPC_OCELLUS_PHASE3_UNLEASH_OUT) {
             untetherTick = tick;
             untetherArea = npc.getWorldArea();
+            isUntethering = false;
         }
     }
 
@@ -428,6 +505,9 @@ public class OcellusP3Detector extends BaseMistakeDetector {
             voidGriefHitTiles.add(tile);
         } else if (graphicsObject.getId() == SpotanimID.VFX_OCELLUS_P2_AOE_DODGE) {
             purpleHitTiles.put(client.getTickCount() + PURPLE_TILE_HIT_DELAY_IN_TICKS, tile);
+            if (isUntethering) {
+                untetherMageHitTicks.add(client.getTickCount() + UNTETHER_MAGE_HIT_DELAY_IN_TICKS);
+            }
         }
     }
 
@@ -439,11 +519,7 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         int amount = event.getHitsplat().getAmount();
         if (amount > 0) {
             raiderHits.merge(event.getActor().getName(), amount, Math::max);
-        }
-
-        boolean isVoidExplosionWindow = voidExplosionStartTick >= 0 && client.getTickCount() >= voidExplosionStartTick;
-        if (isVoidExplosionWindow && amount >= MIN_VOID_EXPLOSION_HIT && amount <= MAX_VOID_EXPLOSION_HIT) {
-            voidExplosionRaiders.add(event.getActor().getName());
+            raiderHitCounts.merge(event.getActor().getName(), 1, Integer::sum);
         }
     }
 

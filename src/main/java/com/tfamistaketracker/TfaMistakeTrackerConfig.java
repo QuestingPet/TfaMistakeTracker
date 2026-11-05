@@ -482,14 +482,25 @@ public interface TfaMistakeTrackerConfig extends Config {
     }
 
     @ConfigItem(
-            keyName = "ocellusP3UntetherMessage",
-            name = "Ocellus P3 Untether",
-            description = "Message to show when caught in Ocellus' untether explosion in phase 3.",
+            keyName = "ocellusP3UntetherExplosionMessage",
+            name = "Ocellus P3 Untether Explosion",
+            description = "Message to show when caught in Ocellus' Untether Explosion in phase 3.",
             section = ocellusP3MistakeSettings,
             position = 6
     )
-    default String ocellusP3UntetherMessage() {
-        return TfaMistake.OCELLUS_P3_UNTETHER.getDefaultMessage();
+    default String ocellusP3UntetherExplosionMessage() {
+        return TfaMistake.OCELLUS_P3_UNTETHER_EXPLOSION.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "ocellusP3UntetherMageMessage",
+            name = "Ocellus P3 Untether Mage",
+            description = "Message to show when not praying magic as Ocellus' Untether special hits in phase 3.",
+            section = ocellusP3MistakeSettings,
+            position = 7
+    )
+    default String ocellusP3UntetherMageMessage() {
+        return TfaMistake.OCELLUS_P3_UNTETHER_MAGE.getDefaultMessage();
     }
 
     @ConfigItem(
@@ -497,10 +508,21 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P3 Fall",
             description = "Message to show when falling into the abyss in Ocellus phase 3.",
             section = ocellusP3MistakeSettings,
-            position = 7
+            position = 8
     )
     default String ocellusP3FallMessage() {
         return TfaMistake.OCELLUS_P3_FALL.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "ocellusP4VoidSpaceMessage",
+            name = "Ocellus P4 Void Space",
+            description = "Message to show when standing on space tiles during Ocellus' siphon in phase 4.",
+            section = ocellusP3MistakeSettings,
+            position = 9
+    )
+    default String ocellusP4VoidSpaceMessage() {
+        return TfaMistake.OCELLUS_P4_VOID_SPACE.getDefaultMessage();
     }
 
     @ConfigItem(
@@ -508,7 +530,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P4 Void Explosion",
             description = "Message to show when caught by a void explosion chasing you after Ocellus' siphon in phase 4.",
             section = ocellusP3MistakeSettings,
-            position = 8
+            position = 10
     )
     default String ocellusP4VoidExplosionMessage() {
         return TfaMistake.OCELLUS_P4_VOID_EXPLOSION.getDefaultMessage();
@@ -519,7 +541,7 @@ public interface TfaMistakeTrackerConfig extends Config {
             name = "Ocellus P4 Prayer Attack",
             description = "Message to show when hit by Ocellus' prayer attack in phase 4 without the matching prayer.",
             section = ocellusP3MistakeSettings,
-            position = 9
+            position = 11
     )
     default String ocellusP4PrayerAttackMessage() {
         return TfaMistake.OCELLUS_P4_PRAYER_ATTACK.getDefaultMessage();
