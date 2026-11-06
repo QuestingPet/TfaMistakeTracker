@@ -74,8 +74,9 @@ public class DreadnothDetector extends BaseMistakeDetector {
     private NPC dreadnoth;
     private WorldArea previousDreadnothArea;
     private int landingTick;
-    // Once he dies only the blood pools and jellies can still hurt anyone
+    // Once he dies only the blood pools, jellies and his final ranged volley can still hurt anyone
     private boolean isDreadnothDead;
+    private int deathTick;
 
     private final Set<Integer> slamTicks = new HashSet<>();
     private final Set<String> jellyTargets = new HashSet<>();
@@ -141,12 +142,12 @@ public class DreadnothDetector extends BaseMistakeDetector {
             mistakes.add(DREADNOTH_JELLY);
         }
 
-        if (isDreadnothDead) {
-            return mistakes;
-        }
-
         if (isRangeHit(raider)) {
             mistakes.add(DREADNOTH_RANGE);
+        }
+
+        if (isDreadnothDead) {
+            return mistakes;
         }
 
         if (isInside(previousLocation)) {
@@ -276,8 +277,8 @@ public class DreadnothDetector extends BaseMistakeDetector {
 
     private void onDreadnothDeath() {
         isDreadnothDead = true;
+        deathTick = client.getTickCount();
         slamTicks.clear();
-        rangeOverheadTracker.clear();
         landingHitTiles.clear();
         bloodBallHitTiles.clear();
         trackedBloodBalls.clear();
@@ -301,7 +302,10 @@ public class DreadnothDetector extends BaseMistakeDetector {
     public void onProjectileMoved(ProjectileMoved event) {
         Projectile projectile = event.getProjectile();
         if (RANGE_ATTACKS.containsKey(projectile.getId())) {
-            rangeOverheadTracker.trackProjectile(event, client.getTickCount());
+            // He fires one last volley the tick after he starts dying
+            if (!isDreadnothDead || client.getTickCount() <= deathTick + 1) {
+                rangeOverheadTracker.trackProjectile(event, client.getTickCount());
+            }
         } else if (projectile.getId() == SpotanimID.VFX_DREADNOTH_RANGED_PROJ02 &&
                 trackedBloodBalls.add(projectile)) {
             bloodBallHitTiles.put(getActivationTick(projectile), projectile.getTargetPoint());
