@@ -8,7 +8,6 @@ import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
@@ -305,26 +304,6 @@ public class OcellusP3Detector extends BaseMistakeDetector {
         }
         voidFlareDetonationCount = 0;
         fallingRaiders.clear();
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @Override
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderHitTiles(aoeHitTiles);
-        overlay.renderHitTiles(insolenceHitTiles);
-        overlay.renderHitTiles(voidGriefHitTiles);
-        overlay.renderHitTiles(purpleHitTiles);
-        overlay.renderLastingTiles(voidFloorTiles.keySet());
-
-        // Everything outside him is hit first, then under him
-        if (untetherArea != null) {
-            int tick = client.getTickCount();
-            if (tick == untetherTick) {
-                overlay.renderSafeTiles(untetherArea.toWorldPointList());
-            } else if (tick == untetherTick + 1) {
-                overlay.renderActiveTiles(untetherArea.toWorldPointList());
-            }
-        }
     }
 
     private boolean isOffPrayer(Raider raider, HeadIcon requiredHeadIcon) {

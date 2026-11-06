@@ -9,7 +9,6 @@ import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
@@ -132,16 +131,6 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
 
     @Override
     public void afterDetect() {
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @Override
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderHitTiles(fallHitTiles);
-        overlay.renderHitTiles(meleeHitTiles);
-        overlay.renderProjectiles(rangeOverheadTracker);
-        overlay.renderHitTiles(mushroomHitTiles);
-        overlay.renderHitTiles(vineHitTiles);
     }
 
     private boolean isRangeHit(Raider raider) {

@@ -6,7 +6,6 @@ import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.HitsplatID;
@@ -90,12 +89,6 @@ public class OcellusP2Detector extends BaseMistakeDetector {
     @Override
     public void afterDetect() {
         bigHitRaiders.clear();
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @Override
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderHitTiles(purpleHitTiles);
     }
 
     private boolean isPortalHit(Raider raider) {

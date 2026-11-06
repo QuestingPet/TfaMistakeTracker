@@ -17,11 +17,9 @@ import com.tfamistaketracker.detector.boss.XarthDetector;
 import com.tfamistaketracker.detector.death.DeathDetector;
 import com.tfamistaketracker.detector.tracker.BaseRaidTracker;
 import com.tfamistaketracker.detector.tracker.VengeanceTracker;
-import com.tfamistaketracker.events.DetectorErrored;
 import com.tfamistaketracker.events.RaidRoomChanged;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
@@ -68,13 +66,6 @@ public class MistakeDetectorManager {
 
     // How many of each NPC id that some detector requires are currently spawned
     private final Multiset<Integer> requiredNpcCounts = HashMultiset.create();
-
-    // DEBUG ONLY -- shown on the debug overlay, remove before publishing
-    @Getter
-    private int errorCount;
-
-    @Getter
-    private DetectorErrored lastError;
 
     @Inject
     public MistakeDetectorManager(Client client,
@@ -179,9 +170,6 @@ public class MistakeDetectorManager {
     // Catch per detector so one broken detector can't stop the others, or the raiders' locations from updating
     private void onError(Object source, RuntimeException e) {
         log.warn("{} threw an exception", source.getClass().getSimpleName(), e);
-        errorCount++;
-        lastError = new DetectorErrored(client.getTickCount(), source.getClass().getSimpleName(), e);
-        eventBus.post(lastError);
     }
 
     @Subscribe
@@ -243,39 +231,4 @@ public class MistakeDetectorManager {
         return detector.getRequiredNpcId() == null || requiredNpcCounts.contains(detector.getRequiredNpcId());
     }
 
-    // DEBUG ONLY -- uses reflection for hotswap. Remove before publishing.
-    @SneakyThrows
-    @VisibleForTesting
-    public void reset() {
-        for (int i = 0; i < mistakeDetectors.size(); i++) {
-            BaseMistakeDetector detector = mistakeDetectors.get(i);
-            try {
-                detector.shutdown();
-            } catch (Exception e) {
-                log.error("Failed to shutdown old detector while resetting state", e);
-                // Continue anyway
-            }
-            BaseMistakeDetector newInstance = detector.getClass().getDeclaredConstructor().newInstance();
-            newInstance.setClient(client);
-            newInstance.setEventBus(eventBus);
-            newInstance.setRaidState(raidstate);
-            newInstance.setVengeanceTracker(vengeanceTracker);
-            if (started && shouldBeStarted(newInstance, raidstate.getCurrentRoom())) {
-                newInstance.startup();
-            }
-            mistakeDetectors.set(i, newInstance);
-        }
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @VisibleForTesting
-    public <T extends BaseMistakeDetector> T getMistakeDetector(Class<T> clazz) {
-        for (BaseMistakeDetector detector : mistakeDetectors) {
-            if (detector.getClass().equals(clazz)) {
-                return clazz.cast(detector);
-            }
-        }
-
-        return null;
-    }
 }

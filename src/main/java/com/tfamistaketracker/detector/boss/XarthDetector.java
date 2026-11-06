@@ -6,7 +6,6 @@ import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
@@ -121,14 +120,6 @@ public class XarthDetector extends BaseMistakeDetector {
     public void afterDetect() {
         meleeTargets.clear();
         corpseHealCount = 0;
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @Override
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderHitTiles(tetherHitTiles);
-        overlay.renderHitTiles(explosionHitTiles);
-        overlay.renderLastingTiles(fireTiles.keySet());
     }
 
     private boolean isOnFire(WorldPoint location) {

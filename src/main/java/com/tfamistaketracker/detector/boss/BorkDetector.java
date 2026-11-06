@@ -9,7 +9,6 @@ import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.AppliedHitsplatsTracker;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.HeadIcon;
@@ -142,16 +141,6 @@ public class BorkDetector extends BaseMistakeDetector {
     @Override
     public void afterDetect() {
         appliedHitsplats.clear();
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @Override
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderHitTiles(stompHitTiles);
-        overlay.renderHitTiles(meleeHitTiles);
-        overlay.renderHitTiles(fireballHitTiles);
-        overlay.renderProjectiles(smorksOverheadTracker);
-        overlay.renderLastingTiles(fireTiles.keySet());
     }
 
     private boolean isOnFire(WorldPoint location) {

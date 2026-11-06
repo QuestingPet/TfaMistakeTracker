@@ -8,7 +8,6 @@ import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.HeadIcon;
@@ -85,13 +84,6 @@ public class OcellusP1Detector extends BaseMistakeDetector {
 
     @Override
     public void afterDetect() {
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @Override
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderProjectiles(autoAttackOverheadTracker);
-        overlay.renderHitTiles(slamHitTiles);
     }
 
     private boolean isAutoAttackHit(Raider raider) {

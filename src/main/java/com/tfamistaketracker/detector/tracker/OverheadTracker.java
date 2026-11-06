@@ -12,7 +12,6 @@ import net.runelite.api.Projectile;
 import net.runelite.api.events.ProjectileMoved;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -203,21 +202,6 @@ public class OverheadTracker extends DelayedObjectsTracker<Projectile> {
         }
 
         return null;
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    public Map<Projectile, Integer> getHitTicks() {
-        return Collections.unmodifiableMap(hitTicks);
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    public Attack getAttack(Projectile projectile) {
-        return attacks.get(projectile.getId());
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    public HeadIcon getDecidingOverhead(Projectile projectile) {
-        return decidingOverheads.get(projectile);
     }
 
     private boolean hasEnoughRemainingCycles(Projectile projectile) {

@@ -8,7 +8,6 @@ import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.AppliedHitsplatsTracker;
 import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
@@ -174,19 +173,6 @@ public class DreadnothDetector extends BaseMistakeDetector {
         jellyTargets.clear();
         appliedHitsplats.clear();
         previousDreadnothArea = dreadnoth == null ? null : dreadnoth.getWorldArea();
-    }
-
-    // DEBUG ONLY -- remove before publishing
-    @Override
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-        overlay.renderProjectiles(rangeOverheadTracker);
-        overlay.renderHitTiles(landingHitTiles);
-        overlay.renderHitTiles(bloodBallHitTiles);
-        overlay.renderLastingTiles(bloodPools.keySet());
-        if (previousDreadnothArea != null && client.getTickCount() > landingTick + INSIDE_DELAY_AFTER_LANDING_IN_TICKS &&
-                !isDreadnothDead) {
-            overlay.renderLastingTiles(previousDreadnothArea.toWorldPointList());
-        }
     }
 
     private boolean isSlamHit(Raider raider) {

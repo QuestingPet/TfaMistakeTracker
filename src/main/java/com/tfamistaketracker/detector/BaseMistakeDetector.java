@@ -6,10 +6,8 @@ import com.tfamistaketracker.RaidState;
 import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.tracker.VengeanceTracker;
-import com.tfamistaketracker.overlay.DebugTilesOverlay;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.Setter;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.Constants;
@@ -31,19 +29,15 @@ public abstract class BaseMistakeDetector {
     protected static final int CYCLES_PER_GAME_TICK = Constants.GAME_TICK_LENGTH / Constants.CLIENT_TICK_LENGTH;
 
     @Inject
-    @Setter
     protected Client client;
 
     @Inject
-    @Setter
     protected EventBus eventBus;
 
     @Inject
-    @Setter
     protected RaidState raidState;
 
     @Inject
-    @Setter
     protected VengeanceTracker vengeanceTracker;
 
     @Getter
@@ -105,14 +99,6 @@ public abstract class BaseMistakeDetector {
      * for this {@link net.runelite.api.events.GameTick}. Commonly, this is to cleanup state from after this tick.
      */
     public abstract void afterDetect();
-
-    /**
-     * DEBUG ONLY -- remove before publishing. Draw whatever this detector is tracking on the debug tiles overlay.
-     *
-     * @param overlay The overlay to draw with
-     */
-    public void renderDebugTiles(DebugTilesOverlay overlay) {
-    }
 
     /**
      * Determines whether or not this detector is currently detecting mistakes. Commonly this is by checking the current
