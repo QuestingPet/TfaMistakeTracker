@@ -11,8 +11,11 @@ import com.tfamistaketracker.detector.tracker.OverheadTracker;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.HeadIcon;
+import net.runelite.api.HitsplatID;
+import net.runelite.api.Player;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.GraphicsObjectCreated;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.ProjectileMoved;
 import net.runelite.api.gameval.NpcID;
 import net.runelite.api.gameval.SpotanimID;
@@ -20,6 +23,7 @@ import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Singleton;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,11 +53,16 @@ public class OcellusP1Detector extends BaseMistakeDetector {
             SpotanimID.VFX_OCELLUS_P1_EXPLODE_FLOOR_270);
 
     private final OverheadTracker autoAttackOverheadTracker = new OverheadTracker(AUTO_ATTACKS);
+    // Early hits are decided a tick late, so vengeance from the tick they landed has to be remembered here
+    private final Set<String> vengeanceThisTick = new HashSet<>();
+    private final Set<String> vengeanceLastTick = new HashSet<>();
     private final InstantHitTilesTracker slamHitTiles = new InstantHitTilesTracker();
 
     @Override
     public void cleanup() {
         autoAttackOverheadTracker.clear();
+        vengeanceThisTick.clear();
+        vengeanceLastTick.clear();
         slamHitTiles.clear();
     }
 
@@ -71,7 +80,12 @@ public class OcellusP1Detector extends BaseMistakeDetector {
     @Override
     public List<TfaMistake> detectMistakes(@NonNull Raider raider) {
         List<TfaMistake> mistakes = new ArrayList<>();
-        if (autoAttackOverheadTracker.didMissPrayer(raider)) {
+        if (vengeanceTracker.didPopVengeance(raider)) {
+            vengeanceThisTick.add(raider.getName());
+        }
+
+        if (autoAttackOverheadTracker.didMissPrayer(raider) && !(autoAttackOverheadTracker.didHitEarly(raider) &&
+                vengeanceLastTick.contains(raider.getName()))) {
             mistakes.add(OCELLUS_P1_AUTO_ATTACK);
         }
 
@@ -84,6 +98,9 @@ public class OcellusP1Detector extends BaseMistakeDetector {
 
     @Override
     public void afterDetect() {
+        vengeanceLastTick.clear();
+        vengeanceLastTick.addAll(vengeanceThisTick);
+        vengeanceThisTick.clear();
     }
 
     @Subscribe
@@ -97,6 +114,18 @@ public class OcellusP1Detector extends BaseMistakeDetector {
         if (!AUTO_ATTACKS.containsKey(event.getProjectile().getId())) return;
 
         autoAttackOverheadTracker.trackProjectile(event, client.getTickCount());
+    }
+
+    // His projectiles often land a tick before their remaining cycles say
+    @Subscribe
+    public void onHitsplatApplied(HitsplatApplied event) {
+        if (!(event.getActor() instanceof Player)) return;
+
+        int type = event.getHitsplat().getHitsplatType();
+        if (type == HitsplatID.HEAL || type == HitsplatID.POISON || type == HitsplatID.VENOM ||
+                type == HitsplatID.DISEASE || type == HitsplatID.BURN) return;
+
+        autoAttackOverheadTracker.onHitsplatApplied(event.getActor(), client.getTickCount());
     }
 
     @Subscribe

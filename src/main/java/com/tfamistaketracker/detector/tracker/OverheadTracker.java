@@ -67,6 +67,15 @@ public class OverheadTracker extends DelayedObjectsTracker<Projectile> {
     // Projectile -> tick it hits on
     private final Map<Projectile, Integer> hitTicks = new HashMap<>();
 
+    // Projectile -> tick it was first seen on
+    private final Map<Projectile, Integer> spawnTicks = new HashMap<>();
+
+    // For projectiles that can land a tick early: their target's overhead the tick before the hit tick, and whether a
+    // hitsplat landed on the target that tick or on the hit tick
+    private final Map<Projectile, HeadIcon> earlyOverheads = new HashMap<>();
+    private final Set<Projectile> earlyHits = new HashSet<>();
+    private final Set<Projectile> onTimeHits = new HashSet<>();
+
     /**
      * Snapshots every raider's current overhead for attacks from the given source. Call this from a GameTick on the
      * tick the source started its attack animation, for {@link PrayerCheck#ANIMATION} attacks.
@@ -105,6 +114,7 @@ public class OverheadTracker extends DelayedObjectsTracker<Projectile> {
         put(hitTick, projectile);
         trackedProjectiles.add(projectile);
         hitTicks.put(projectile, hitTick);
+        spawnTicks.put(projectile, currentTick);
 
         switch (attack.getPrayerCheck()) {
             case ANIMATION:
@@ -130,11 +140,20 @@ public class OverheadTracker extends DelayedObjectsTracker<Projectile> {
         prayerCheckTicks.entrySet().removeIf(entry -> {
             if (entry.getValue() != gameTick.intValue()) return false;
 
-            Actor target = entry.getKey().getTargetActor();
-            if (target instanceof Player) {
-                decidingOverheads.put(entry.getKey(), ((Player) target).getOverheadIcon());
+            Projectile projectile = entry.getKey();
+            if (earlyHits.contains(projectile) && !onTimeHits.contains(projectile) &&
+                    earlyOverheads.containsKey(projectile)) {
+                decidingOverheads.put(projectile, earlyOverheads.get(projectile));
+            } else if (projectile.getTargetActor() instanceof Player) {
+                decidingOverheads.put(projectile, ((Player) projectile.getTargetActor()).getOverheadIcon());
             }
             return true;
+        });
+
+        hitTicks.forEach((projectile, hitTick) -> {
+            if (hitTick == gameTick + 1 && projectile.getTargetActor() instanceof Player) {
+                earlyOverheads.put(projectile, ((Player) projectile.getTargetActor()).getOverheadIcon());
+            }
         });
 
         hitTicks.entrySet().removeIf(entry -> {
@@ -142,6 +161,10 @@ public class OverheadTracker extends DelayedObjectsTracker<Projectile> {
             if (hit) {
                 prayerCheckTicks.remove(entry.getKey());
                 decidingOverheads.remove(entry.getKey());
+                spawnTicks.remove(entry.getKey());
+                earlyOverheads.remove(entry.getKey());
+                earlyHits.remove(entry.getKey());
+                onTimeHits.remove(entry.getKey());
             }
             return hit;
         });
@@ -158,6 +181,30 @@ public class OverheadTracker extends DelayedObjectsTracker<Projectile> {
         prayerCheckTicks.clear();
         decidingOverheads.clear();
         hitTicks.clear();
+        spawnTicks.clear();
+        earlyOverheads.clear();
+        earlyHits.clear();
+        onTimeHits.clear();
+    }
+
+    /**
+     * Some projectiles can land a tick before their remaining cycles say. If a hitsplat lands on the target the tick
+     * before the hit tick and none lands on the hit tick, the prayer from the tick before is used instead. Call this
+     * from a HitsplatApplied event.
+     *
+     * @param target      The actor the hitsplat landed on
+     * @param currentTick The current game tick
+     */
+    public void onHitsplatApplied(@NonNull Actor target, int currentTick) {
+        hitTicks.forEach((projectile, hitTick) -> {
+            if (projectile.getTargetActor() != target || spawnTicks.get(projectile) >= currentTick) return;
+
+            if (hitTick == currentTick + 1) {
+                earlyHits.add(projectile);
+            } else if (hitTick == currentTick) {
+                onTimeHits.add(projectile);
+            }
+        });
     }
 
     public Set<Projectile> getActiveProjectiles() {
@@ -185,6 +232,18 @@ public class OverheadTracker extends DelayedObjectsTracker<Projectile> {
                 ? decidingOverheads.get(activeProjectile)
                 : raider.getPlayer().getOverheadIcon();
         return overhead != attack.getRequiredHeadIcon();
+    }
+
+    /**
+     * Determine whether the projectile hitting the given raider this tick actually landed the tick before
+     *
+     * @param raider The raider
+     * @return True if it landed a tick early, false otherwise
+     */
+    public boolean didHitEarly(Raider raider) {
+        Projectile activeProjectile = getActiveProjectileForRaider(raider);
+        return activeProjectile != null && earlyHits.contains(activeProjectile) &&
+                !onTimeHits.contains(activeProjectile);
     }
 
     /**
