@@ -131,7 +131,7 @@ public class BorkDetector extends BaseMistakeDetector {
             mistakes.add(BORK_MELEE);
         }
 
-        if (isSmorksHit(raider)) {
+        if (smorksOverheadTracker.didMissPrayer(raider)) {
             mistakes.add(BORK_SMORKS_AA);
         }
 
@@ -153,19 +153,11 @@ public class BorkDetector extends BaseMistakeDetector {
             return false;
         }
 
-        if (vengeanceTracker.didPopVengeance(raider) || raider.getPlayer().getOverheadIcon() == HeadIcon.MELEE) {
+        if (raider.getPlayer().getOverheadIcon() == HeadIcon.MELEE) {
             return false;
         }
 
         return appliedHitsplats.popHitsplatApplied(raider.getName());
-    }
-
-    private boolean isSmorksHit(Raider raider) {
-        if (vengeanceTracker.didPopVengeance(raider)) {
-            return false;
-        }
-
-        return smorksOverheadTracker.didMissPrayer(raider);
     }
 
     @Subscribe

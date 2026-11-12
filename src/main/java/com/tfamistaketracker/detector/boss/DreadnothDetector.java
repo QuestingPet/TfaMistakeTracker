@@ -141,7 +141,7 @@ public class DreadnothDetector extends BaseMistakeDetector {
             mistakes.add(DREADNOTH_JELLY);
         }
 
-        if (isRangeHit(raider)) {
+        if (rangeOverheadTracker.didMissPrayer(raider)) {
             mistakes.add(DREADNOTH_RANGE);
         }
 
@@ -180,19 +180,7 @@ public class DreadnothDetector extends BaseMistakeDetector {
             return false;
         }
 
-        if (vengeanceTracker.didPopVengeance(raider)) {
-            return false;
-        }
-
         return raider.getPlayer().getOverheadIcon() != HeadIcon.MELEE;
-    }
-
-    private boolean isRangeHit(Raider raider) {
-        if (vengeanceTracker.didPopVengeance(raider)) {
-            return false;
-        }
-
-        return rangeOverheadTracker.didMissPrayer(raider);
     }
 
     private boolean isBloodPoolHit(Raider raider) {

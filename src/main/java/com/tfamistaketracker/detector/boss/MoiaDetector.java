@@ -89,7 +89,7 @@ public class MoiaDetector extends BaseMistakeDetector {
     @Override
     public List<TfaMistake> detectMistakes(@NonNull Raider raider) {
         List<TfaMistake> mistakes = new ArrayList<>();
-        if (isMoiaDead || vengeanceTracker.didPopVengeance(raider)) {
+        if (isMoiaDead) {
             return mistakes;
         }
 

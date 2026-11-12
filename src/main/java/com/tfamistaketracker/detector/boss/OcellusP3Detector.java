@@ -307,10 +307,6 @@ public class OcellusP3Detector extends BaseMistakeDetector {
     }
 
     private boolean isOffPrayer(Raider raider, HeadIcon requiredHeadIcon) {
-        if (vengeanceTracker.didPopVengeance(raider)) {
-            return false;
-        }
-
         return raider.getPlayer().getOverheadIcon() != requiredHeadIcon;
     }
 

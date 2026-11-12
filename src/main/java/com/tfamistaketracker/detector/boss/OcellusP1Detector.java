@@ -71,7 +71,7 @@ public class OcellusP1Detector extends BaseMistakeDetector {
     @Override
     public List<TfaMistake> detectMistakes(@NonNull Raider raider) {
         List<TfaMistake> mistakes = new ArrayList<>();
-        if (isAutoAttackHit(raider)) {
+        if (autoAttackOverheadTracker.didMissPrayer(raider)) {
             mistakes.add(OCELLUS_P1_AUTO_ATTACK);
         }
 
@@ -84,14 +84,6 @@ public class OcellusP1Detector extends BaseMistakeDetector {
 
     @Override
     public void afterDetect() {
-    }
-
-    private boolean isAutoAttackHit(Raider raider) {
-        if (vengeanceTracker.didPopVengeance(raider)) {
-            return false;
-        }
-
-        return autoAttackOverheadTracker.didMissPrayer(raider);
     }
 
     @Subscribe

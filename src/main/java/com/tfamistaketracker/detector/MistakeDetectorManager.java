@@ -145,6 +145,11 @@ public class MistakeDetectorManager {
             }
         }
 
+        // Vengeance only procs off one hit, so it only drops one vengeable mistake, the lowest priority one
+        if (vengeanceTracker.didPopVengeance(raider)) {
+            mistakes.stream().filter(TfaMistake::isVengeableMistake).findFirst().ifPresent(mistakes::remove);
+        }
+
         return mistakes;
     }
 

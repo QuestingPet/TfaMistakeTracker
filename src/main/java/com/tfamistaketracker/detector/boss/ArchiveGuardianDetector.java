@@ -109,12 +109,11 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
             mistakes.add(ARCHIVE_GUARDIAN_FALL);
         }
 
-        if (meleeHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation()) &&
-                !vengeanceTracker.didPopVengeance(raider)) {
+        if (meleeHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(ARCHIVE_GUARDIAN_MELEE);
         }
 
-        if (isRangeHit(raider)) {
+        if (rangeOverheadTracker.didMissPrayer(raider)) {
             mistakes.add(ARCHIVE_GUARDIAN_RANGE);
         }
 
@@ -131,14 +130,6 @@ public class ArchiveGuardianDetector extends BaseMistakeDetector {
 
     @Override
     public void afterDetect() {
-    }
-
-    private boolean isRangeHit(Raider raider) {
-        if (vengeanceTracker.didPopVengeance(raider)) {
-            return false;
-        }
-
-        return rangeOverheadTracker.didMissPrayer(raider);
     }
 
     @Subscribe

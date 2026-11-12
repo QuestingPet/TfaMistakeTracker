@@ -132,10 +132,6 @@ public class XarthDetector extends BaseMistakeDetector {
             return false;
         }
 
-        if (vengeanceTracker.didPopVengeance(raider)) {
-            return false;
-        }
-
         return raider.getPlayer().getOverheadIcon() != HeadIcon.MELEE;
     }
 
