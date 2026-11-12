@@ -47,6 +47,8 @@ public class RaidState {
     private static final int TFA_HUD_ORBS_SCRIPT_ID = 10037;
     // Spectating a raid you're not in, rather than your own after dying
     private static final int EXTERNAL_SPECTATE_MODE = 2;
+    // The party names are only written a few ticks into a raid, so fall back to what's there for mid-raid startups
+    private static final int PARTY_WRITE_TIMEOUT_TICKS = 5;
 
     private static final List<Integer> TFA_RAIDER_NAME_VARCS = ImmutableList.of(
             VarClientID.TFA_CLIENT_NAME0,
@@ -75,6 +77,9 @@ public class RaidState {
     private boolean newRaid;
     // Name varcs are written one at a time on raid entry, so load raiders on the next tick once they've all been set
     private boolean raidersDirty;
+    // Until the name varcs are written for this raid they still hold the last raid's party
+    private int raidStartTick;
+    private int lastPartyWriteTick;
 
     public void startUp() {
         clearState();
@@ -94,6 +99,8 @@ public class RaidState {
         prevPlane = -1;
         newRaid = false;
         raidersDirty = false;
+        raidStartTick = -1;
+        lastPartyWriteTick = -1;
     }
 
     @Subscribe(priority = 5)
@@ -119,7 +126,7 @@ public class RaidState {
         }
 
         // Keep trying until all raiders are loaded, e.g. if the plugin is turned on mid-raid
-        if (raidersDirty || !isAllRaidersLoaded(getRaiderNames())) {
+        if (raidersDirty || newRaid || !isAllRaidersLoaded(getRaiderNames())) {
             updateRaiders();
         }
     }
@@ -145,9 +152,10 @@ public class RaidState {
 
     @Subscribe
     public void onVarClientStrChanged(VarClientStrChanged event) {
-        if (!inRaid) return;
+        if (!TFA_RAIDER_NAME_VARCS_SET.contains(event.getIndex())) return;
 
-        if (TFA_RAIDER_NAME_VARCS_SET.contains(event.getIndex())) {
+        lastPartyWriteTick = client.getTickCount();
+        if (inRaid) {
             raidersDirty = true;
         }
     }
@@ -209,6 +217,7 @@ public class RaidState {
         if (inRaid) {
             // RaidEntered is posted once the raiders are loaded
             newRaid = true;
+            raidStartTick = client.getTickCount();
         } else {
             newRaid = false;
         }
@@ -255,7 +264,9 @@ public class RaidState {
             return; // Will try again next tick
         }
 
-        if (newRaid) {
+        boolean isPartyWritten = lastPartyWriteTick >= raidStartTick ||
+                client.getTickCount() - raidStartTick >= PARTY_WRITE_TIMEOUT_TICKS;
+        if (newRaid && isPartyWritten) {
             log.debug("New raid");
             eventBus.post(new RaidEntered(ImmutableList.copyOf(raiders.keySet())));
             newRaid = false;
