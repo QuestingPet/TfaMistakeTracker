@@ -198,9 +198,50 @@ public interface TfaMistakeTrackerConfig extends Config {
     }
 
     @ConfigSection(
+            name = "Moia Mistake Messages",
+            description = "Settings for the messages shown on Moia mistakes (separate multiple messages by \"|\").",
+            position = 7,
+            closedByDefault = true
+    )
+    String moiaMistakeSettings = "moiaMistakeSettings";
+
+    @ConfigItem(
+            keyName = "moiaBinderMeleeMessage",
+            name = "Moia Binder Melee",
+            description = "Message to show when hit by an undead binder without praying melee at Moia.",
+            section = moiaMistakeSettings,
+            position = 0
+    )
+    default String moiaBinderMeleeMessage() {
+        return TfaMistake.MOIA_BINDER_MELEE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "moiaRangeMessage",
+            name = "Moia Range",
+            description = "Message to show when not praying missiles as Moia starts her ranged attack.",
+            section = moiaMistakeSettings,
+            position = 1
+    )
+    default String moiaRangeMessage() {
+        return TfaMistake.MOIA_RANGE.getDefaultMessage();
+    }
+
+    @ConfigItem(
+            keyName = "moiaMagicMessage",
+            name = "Moia Magic",
+            description = "Message to show when not praying magic as Moia's magic attack hits.",
+            section = moiaMistakeSettings,
+            position = 2
+    )
+    default String moiaMagicMessage() {
+        return TfaMistake.MOIA_MAGIC.getDefaultMessage();
+    }
+
+    @ConfigSection(
             name = "Dreadnoth Mistake Messages",
             description = "Settings for the messages shown on Dreadnoth mistakes (separate multiple messages by \"|\").",
-            position = 7,
+            position = 8,
             closedByDefault = true
     )
     String dreadnothMistakeSettings = "dreadnothMistakeSettings";
@@ -285,7 +326,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Xarth Mistake Messages",
             description = "Settings for the messages shown on Xarth mistakes (separate multiple messages by \"|\").",
-            position = 8,
+            position = 9,
             closedByDefault = true
     )
     String xarthMistakeSettings = "xarthMistakeSettings";
@@ -348,7 +389,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Ocellus P1 Mistake Messages",
             description = "Settings for the messages shown on Ocellus phase 1 mistakes (separate multiple messages by \"|\").",
-            position = 9,
+            position = 10,
             closedByDefault = true
     )
     String ocellusP1MistakeSettings = "ocellusP1MistakeSettings";
@@ -378,7 +419,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Ocellus P2 Mistake Messages",
             description = "Settings for the messages shown on Ocellus phase 2 mistakes (separate multiple messages by \"|\").",
-            position = 10,
+            position = 11,
             closedByDefault = true
     )
     String ocellusP2MistakeSettings = "ocellusP2MistakeSettings";
@@ -408,7 +449,7 @@ public interface TfaMistakeTrackerConfig extends Config {
     @ConfigSection(
             name = "Ocellus P3 Mistake Messages",
             description = "Settings for the messages shown on Ocellus phase 3 mistakes (separate multiple messages by \"|\").",
-            position = 11,
+            position = 12,
             closedByDefault = true
     )
     String ocellusP3MistakeSettings = "ocellusP3MistakeSettings";

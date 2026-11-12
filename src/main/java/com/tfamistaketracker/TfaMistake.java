@@ -45,6 +45,14 @@ public enum TfaMistake {
     BORK_FIREBALL("Bork Fireball", TfaMistakeTrackerConfig::borkFireballMessage, "I got cannonballed!",
             "bork-smorks-fireball.png"),
 
+    // Moia
+    MOIA_BINDER_MELEE("Moia Binder Melee", TfaMistakeTrackerConfig::moiaBinderMeleeMessage, "Don't touch me!",
+            "prot-melee.png"),
+    MOIA_RANGE("Moia Range", TfaMistakeTrackerConfig::moiaRangeMessage, "I forgot to switch back!",
+            "prot-range.png"),
+    MOIA_MAGIC("Moia Magic", TfaMistakeTrackerConfig::moiaMagicMessage, "I've been backstabbed!",
+            "prot-magic.png"),
+
     // Dreadnoth
     DREADNOTH_SLAM("Dreadnoth Slam", TfaMistakeTrackerConfig::dreadnothSlamMessage, "It's an earthquake!",
             "dreadnoth-slam.png"),

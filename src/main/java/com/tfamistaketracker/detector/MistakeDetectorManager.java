@@ -10,6 +10,7 @@ import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.boss.ArchiveGuardianDetector;
 import com.tfamistaketracker.detector.boss.BorkDetector;
 import com.tfamistaketracker.detector.boss.DreadnothDetector;
+import com.tfamistaketracker.detector.boss.MoiaDetector;
 import com.tfamistaketracker.detector.boss.OcellusP1Detector;
 import com.tfamistaketracker.detector.boss.OcellusP2Detector;
 import com.tfamistaketracker.detector.boss.OcellusP3Detector;
@@ -74,6 +75,7 @@ public class MistakeDetectorManager {
                                   VengeanceTracker vengeanceTracker,
                                   ArchiveGuardianDetector archiveGuardianDetector,
                                   BorkDetector borkDetector,
+                                  MoiaDetector moiaDetector,
                                   DreadnothDetector dreadnothDetector,
                                   XarthDetector xarthDetector,
                                   OcellusP1Detector ocellusP1Detector,
@@ -86,6 +88,7 @@ public class MistakeDetectorManager {
         this.mistakeDetectors = new ArrayList<>(Arrays.asList(
                 archiveGuardianDetector,
                 borkDetector,
+                moiaDetector,
                 dreadnothDetector,
                 xarthDetector,
                 ocellusP1Detector,
