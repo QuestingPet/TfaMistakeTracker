@@ -45,6 +45,8 @@ public enum TfaMistake {
     BORK_FIRE("Bork Fire", TfaMistakeTrackerConfig::borkFireMessage, "It burns!", "bork-smorks-fire-tile.png", false),
     BORK_FIREBALL("Bork Fireball", TfaMistakeTrackerConfig::borkFireballMessage, "I got cannonballed!",
             "bork-smorks-fireball.png", false),
+    BORK_CANNONBALL("Bork Cannonball", TfaMistakeTrackerConfig::borkCannonballMessage, "I got balled!",
+            "bork-smorks-fireball.png", false),
 
     // Moia
     MOIA_BINDER_MELEE("Moia Binder Melee", TfaMistakeTrackerConfig::moiaBinderMeleeMessage, "Don't touch me!",

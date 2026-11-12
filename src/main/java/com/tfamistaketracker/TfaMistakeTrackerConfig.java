@@ -197,6 +197,17 @@ public interface TfaMistakeTrackerConfig extends Config {
         return TfaMistake.BORK_FIREBALL.getDefaultMessage();
     }
 
+    @ConfigItem(
+            keyName = "borkCannonballMessage",
+            name = "Bork Cannonball",
+            description = "Message to show when hit by the Smorks' cannonball at Bork.",
+            section = borkMistakeSettings,
+            position = 5
+    )
+    default String borkCannonballMessage() {
+        return TfaMistake.BORK_CANNONBALL.getDefaultMessage();
+    }
+
     @ConfigSection(
             name = "Moia Mistake Messages",
             description = "Settings for the messages shown on Moia mistakes (separate multiple messages by \"|\").",

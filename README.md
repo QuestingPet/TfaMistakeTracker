@@ -29,6 +29,7 @@ Current mistakes being tracked:
     * ![bork-melee](src/main/resources/com/tfamistaketracker/bork-melee.png) **Melee** prayer miss
     * ![bork-smorks-aa](src/main/resources/com/tfamistaketracker/bork-smorks-aa.png) **The Smorks ranged and magic attacks** prayer miss
     * ![bork-smorks-fireball](src/main/resources/com/tfamistaketracker/bork-smorks-fireball.png) **The Smorks fireball** damage
+    * ![bork-smorks-fireball](src/main/resources/com/tfamistaketracker/bork-smorks-fireball.png) **The Smorks cannonball** damage
     * ![bork-smorks-fire-tile](src/main/resources/com/tfamistaketracker/bork-smorks-fire-tile.png) **Room fire** damage
 * ![dreadnoth](src/main/resources/com/tfamistaketracker/dreadnoth.png) **Dreadnoth**
     * ![dreadnoth-slam](src/main/resources/com/tfamistaketracker/dreadnoth-slam.png) **Jump slam** prayer miss

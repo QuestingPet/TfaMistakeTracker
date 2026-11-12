@@ -7,6 +7,7 @@ import com.tfamistaketracker.Raider;
 import com.tfamistaketracker.TfaMistake;
 import com.tfamistaketracker.detector.BaseMistakeDetector;
 import com.tfamistaketracker.detector.tracker.AppliedHitsplatsTracker;
+import com.tfamistaketracker.detector.tracker.DelayedHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.InstantHitTilesTracker;
 import com.tfamistaketracker.detector.tracker.OverheadTracker;
 import lombok.NonNull;
@@ -15,6 +16,7 @@ import net.runelite.api.HeadIcon;
 import net.runelite.api.HitsplatID;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
+import net.runelite.api.Projectile;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.AnimationChanged;
 import net.runelite.api.events.GameObjectDespawned;
@@ -32,11 +34,13 @@ import net.runelite.client.eventbus.Subscribe;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static com.tfamistaketracker.RaidRoom.BORK;
+import static com.tfamistaketracker.TfaMistake.BORK_CANNONBALL;
 import static com.tfamistaketracker.TfaMistake.BORK_FIRE;
 import static com.tfamistaketracker.TfaMistake.BORK_FIREBALL;
 import static com.tfamistaketracker.TfaMistake.BORK_MELEE;
@@ -48,7 +52,8 @@ import static com.tfamistaketracker.TfaMistake.BORK_STOMP;
  * several waves while he's stomping, and his melee hits twice. Melee prayer reduces the melee but not the stomp.
  * <p>
  * The Smorks fire ranged and magic projectiles that need the matching prayer when they hit. Their fireballs leave
- * fire patches that last until Bork dies and burn anyone standing on them.
+ * fire patches that last until Bork dies and burn anyone standing on them. Their big cannonball is aimed at Bork,
+ * but also hits anyone standing on the tile it lands on.
  */
 @Slf4j
 @Singleton
@@ -80,6 +85,8 @@ public class BorkDetector extends BaseMistakeDetector {
     private final InstantHitTilesTracker stompHitTiles = new InstantHitTilesTracker();
     private final InstantHitTilesTracker meleeHitTiles = new InstantHitTilesTracker();
     private final InstantHitTilesTracker fireballHitTiles = new InstantHitTilesTracker();
+    private final DelayedHitTilesTracker cannonballHitTiles = new DelayedHitTilesTracker();
+    private final Set<Projectile> cannonballs = new HashSet<>();
     private final OverheadTracker smorksOverheadTracker = new OverheadTracker(SMORKS_ATTACKS);
     // Fire tile -> tick it spawned. Fire doesn't burn on the tick it spawns.
     private final Map<WorldPoint, Integer> fireTiles = new HashMap<>();
@@ -100,6 +107,8 @@ public class BorkDetector extends BaseMistakeDetector {
         stompHitTiles.clear();
         meleeHitTiles.clear();
         fireballHitTiles.clear();
+        cannonballHitTiles.clear();
+        cannonballs.clear();
         smorksOverheadTracker.clear();
         fireTiles.clear();
         appliedHitsplats.clear();
@@ -120,6 +129,11 @@ public class BorkDetector extends BaseMistakeDetector {
 
         if (fireballHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation())) {
             mistakes.add(BORK_FIREBALL);
+        }
+
+        if (cannonballHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation()) &&
+                appliedHitsplats.popHitsplatApplied(raider.getName())) {
+            mistakes.add(BORK_CANNONBALL);
         }
 
         if (stompHitTiles.getActiveHitTiles().contains(raider.getPreviousWorldLocation()) &&
@@ -176,6 +190,7 @@ public class BorkDetector extends BaseMistakeDetector {
         stompHitTiles.onGameTick(client.getTickCount());
         meleeHitTiles.onGameTick(client.getTickCount());
         fireballHitTiles.onGameTick(client.getTickCount());
+        cannonballHitTiles.onGameTick(client.getTickCount());
         smorksOverheadTracker.onGameTick(client.getTickCount());
     }
 
@@ -199,7 +214,12 @@ public class BorkDetector extends BaseMistakeDetector {
 
     @Subscribe
     public void onProjectileMoved(ProjectileMoved event) {
-        if (!SMORKS_ATTACKS.containsKey(event.getProjectile().getId())) return;
+        Projectile projectile = event.getProjectile();
+        if (projectile.getId() == SpotanimID.CANNONBALL_TRAVEL_BIG && cannonballs.add(projectile)) {
+            cannonballHitTiles.put(getActivationTick(projectile), WorldPoint.fromLocal(client, event.getPosition()));
+            return;
+        }
+        if (!SMORKS_ATTACKS.containsKey(projectile.getId())) return;
 
         smorksOverheadTracker.trackProjectile(event, client.getTickCount());
     }
