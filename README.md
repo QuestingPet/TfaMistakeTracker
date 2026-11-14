@@ -31,6 +31,10 @@ Current mistakes being tracked:
     * ![bork-smorks-fireball](src/main/resources/com/tfamistaketracker/bork-smorks-fireball.png) **The Smorks fireball** damage
     * ![bork-smorks-fireball](src/main/resources/com/tfamistaketracker/bork-smorks-fireball.png) **The Smorks cannonball** damage
     * ![bork-smorks-fire-tile](src/main/resources/com/tfamistaketracker/bork-smorks-fire-tile.png) **Room fire** damage
+* **Moia**
+    * ![prot-melee](src/main/resources/com/tfamistaketracker/prot-melee.png) **Undead binder melee** prayer miss
+    * ![prot-range](src/main/resources/com/tfamistaketracker/prot-range.png) **Ranged attack** prayer miss
+    * ![prot-magic](src/main/resources/com/tfamistaketracker/prot-magic.png) **Magic attack** prayer miss
 * ![dreadnoth](src/main/resources/com/tfamistaketracker/dreadnoth.png) **Dreadnoth**
     * ![dreadnoth-slam](src/main/resources/com/tfamistaketracker/dreadnoth-slam.png) **Jump slam** prayer miss
     * ![dreadnoth-range](src/main/resources/com/tfamistaketracker/dreadnoth-range.png) **Ranged attack** prayer miss
@@ -68,7 +72,6 @@ Current mistakes being tracked:
 Coming soon, in a later release (only deaths are tracked in these rooms for now):
 
 * **Ezekiel**
-* **Moia**
 * **Dagon'hai trio**
 
 ---
@@ -92,6 +95,14 @@ Coming soon, in a later release (only deaths are tracked in these rooms for now)
 ---
 
 ## Changes
+
+#### 1.1
+
+* Added Moia mistakes: undead binder melee, ranged and magic prayer misses
+* Added The Smorks cannonball mistake at Bork
+* Vengeance now only excuses one prayer mistake per tick, instead of all of them
+* Fixed Ocellus P1 prayer misses being detected wrong when his attacks land a tick early
+* Fixed raiders sometimes missing from the side panel when starting a raid with a new party
 
 #### 1.0
 
