@@ -38,7 +38,7 @@ public enum TfaMistake {
             "Ahh! Tentacles!", "ag-vine.png", false),
 
     // Bork
-    BORK_STOMP("Bork Stomp", TfaMistakeTrackerConfig::borkStompMessage, "He's stomping!", "bork-stomp.png", false),
+    BORK_STOMP("Bork Stomp", TfaMistakeTrackerConfig::borkStompMessage, "He's stomping!", "bork-stomp.png", true),
     BORK_MELEE("Bork Melee", TfaMistakeTrackerConfig::borkMeleeMessage, "He's hitting me!", "bork-melee.png", true),
     BORK_SMORKS_AA("Bork Smorks Auto Attack", TfaMistakeTrackerConfig::borkSmorksAaMessage,
             "Whoops wrong prayer!", "bork-smorks-aa.png", true),
@@ -76,7 +76,7 @@ public enum TfaMistake {
     XARTH_TETHER("Xarth Tether", TfaMistakeTrackerConfig::xarthTetherMessage, "I was checkmated!",
             "xarth-tether.png", false),
     XARTH_EXPLOSION("Xarth Explosion", TfaMistakeTrackerConfig::xarthExplosionMessage, "I'm exploding!",
-            "xarth-explosion.png", false),
+            "xarth-explosion.png", true),
     XARTH_FIRE("Xarth Fire", TfaMistakeTrackerConfig::xarthFireMessage, "I'm burning!", "xarth-fire.png", false),
     XARTH_MELEE("Xarth Melee", TfaMistakeTrackerConfig::xarthMeleeMessage, "The Hash-Slinging Slasher!",
             "xarth-melee.png", true),
@@ -87,7 +87,7 @@ public enum TfaMistake {
     OCELLUS_P1_AUTO_ATTACK("Ocellus P1 Auto Attack", TfaMistakeTrackerConfig::ocellusP1AutoAttackMessage,
             "Whoops wrong prayer!", "ocellus-p1-aa.png", true),
     OCELLUS_P1_SLAM("Ocellus P1 Slam", TfaMistakeTrackerConfig::ocellusP1SlamMessage, "I moved!",
-            "ocellus-p1-slam.png", false),
+            "ocellus-p1-slam.png", true),
     OCELLUS_P2_PORTAL("Ocellus P2 Portal", TfaMistakeTrackerConfig::ocellusP2PortalMessage, "I'm too slow!",
             "ocellus-p2-portals.png", false),
     OCELLUS_P2_PURPLE_TILE("Ocellus P2 Purple Tile", TfaMistakeTrackerConfig::ocellusP2PurpleTileMessage,
