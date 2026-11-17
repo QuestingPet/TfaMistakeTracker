@@ -96,6 +96,10 @@ Coming soon, in a later release (only deaths are tracked in these rooms for now)
 
 ## Changes
 
+#### 1.2
+
+* Bork stomp, Xarth explosion and Ocellus P1 slam are now excused by vengeance
+
 #### 1.1
 
 * Added Moia mistakes: undead binder melee, ranged and magic prayer misses
